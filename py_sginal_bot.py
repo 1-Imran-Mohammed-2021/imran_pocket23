@@ -8,6 +8,7 @@ import telebot
 from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton
 from collections import defaultdict
 import logging
+
 import os
 from dotenv import load_dotenv
 import aiohttp
@@ -27,10 +28,12 @@ import uuid
 # CONFIGURATION
 # ==============================
 load_dotenv()
-TELEGRAM_API_KEY = os.getenv('TELEGRAM_API_KEY')
-CURRENCYFREAKS_API_KEY = os.getenv('CURRENCYFREAKS_API_KEY')
+TELEGRAM_API_KEY='8224411567:AAF8QFxlN2SYZeUadqzt3C-xoF8fwwgQ7b0'
+TWELVE_DATA_API_KEY='66b7861c69a44a9f8177e5ea3313e0d6'
+ADMIN_CHAT_ID='5389240816'
+CURRENCYFREAKS_API_KEY='b9fe0f84cb944521888236f316b8f3a9'
 BINANCE_API_KEY = os.getenv('BINANCE_API_KEY')
-ADMIN_CHAT_ID = os.getenv('ADMIN_CHAT_ID')
+
 
 # Validate CurrencyFreaks API key
 if not CURRENCYFREAKS_API_KEY or CURRENCYFREAKS_API_KEY.strip() == "":

@@ -1,0 +1,38 @@
+2025-08-12 18:37:44,863 - INFO - Supported forex pairs: ['EURUSD', 'USDJPY', 'GBPUSD', 'MADUSD', 'SARCNY', 'CADCHF', 'QARCNY', 'USDCOP', 'USDTHB', 'GBPAUD', 'UAHUSD', 'USDSGD', 'NZDUSD', 'USDDZD', 'USDPKR', 'USDINR', 'EURRUB', 'GBPJPY', 'EURGBP', 'USDVND', 'USDRUB', 'NGNUSD', 'EURCHF', 'CHFNOK', 'BHDCNY', 'JODCNY', 'NZDJPY', 'USDBDT', 'USDMXN', 'EURNZD', 'USDCNH', 'YERUSD', 'USDPHP', 'EURHUF', 'USDEGP', 'CHFJPY', 'ZARUSD', 'LBPUSD', 'USDARS', 'AEDCNY', 'CADJPY', 'USDBRL', 'AUDCHF', 'EURJPY', 'EURTRY', 'KESUSD', 'OMRCNY', 'TNDUSD', 'USDCAD', 'USDCHF', 'USDCLP', 'USDIDR', 'USDMYR']
+2025-08-12 18:37:44,863 - INFO - Starting trading bot...
+2025-08-12 18:37:45,659 - INFO - Fetched 50 historical prices from Binance for BTC
+2025-08-12 18:37:46,003 - INFO - Sent price chart for TEST with signal: BUY
+2025-08-12 18:37:46,186 - INFO - prices_scaled shape in train_model: (50, 1)
+2025-08-12 18:37:46,186 - INFO - X shape after np.array: (40, 10)
+2025-08-12 18:37:46,186 - INFO - y shape: (40,)
+2025-08-12 18:37:46,241 - INFO - X_train shape: torch.Size([32, 10, 1])
+2025-08-12 18:37:46,241 - INFO - X_val shape: torch.Size([8, 10, 1])
+2025-08-12 18:37:55,838 - INFO - Early stopping at epoch 12
+2025-08-12 18:37:55,838 - INFO - Trained model with final validation loss: 0.029215
+2025-08-12 18:38:22,742 - ERROR - Threaded polling exception: A request to the Telegram API was unsuccessful. Error code: 409. Description: Conflict: terminated by other getUpdates request; make sure that only one bot instance is running
+2025-08-12 18:38:22,742 - ERROR - Exception traceback:
+Traceback (most recent call last):
+  File "C:\Users\OS\AppData\Local\Packages\PythonSoftwareFoundation.Python.3.11_qbz5n2kfra8p0\LocalCache\local-packages\Python311\site-packages\telebot\__init__.py", line 1234, in __threaded_polling
+    polling_thread.raise_exceptions()
+  File "C:\Users\OS\AppData\Local\Packages\PythonSoftwareFoundation.Python.3.11_qbz5n2kfra8p0\LocalCache\local-packages\Python311\site-packages\telebot\util.py", line 112, in raise_exceptions
+    raise self.exception_info
+  File "C:\Users\OS\AppData\Local\Packages\PythonSoftwareFoundation.Python.3.11_qbz5n2kfra8p0\LocalCache\local-packages\Python311\site-packages\telebot\util.py", line 94, in run
+    task(*args, **kwargs)
+  File "C:\Users\OS\AppData\Local\Packages\PythonSoftwareFoundation.Python.3.11_qbz5n2kfra8p0\LocalCache\local-packages\Python311\site-packages\telebot\__init__.py", line 688, in __retrieve_updates
+    updates = self.get_updates(offset=(self.last_update_id + 1),
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\OS\AppData\Local\Packages\PythonSoftwareFoundation.Python.3.11_qbz5n2kfra8p0\LocalCache\local-packages\Python311\site-packages\telebot\__init__.py", line 660, in get_updates
+    json_updates = apihelper.get_updates(
+                   ^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\OS\AppData\Local\Packages\PythonSoftwareFoundation.Python.3.11_qbz5n2kfra8p0\LocalCache\local-packages\Python311\site-packages\telebot\apihelper.py", line 332, in get_updates
+    return _make_request(token, method_url, params=payload)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\OS\AppData\Local\Packages\PythonSoftwareFoundation.Python.3.11_qbz5n2kfra8p0\LocalCache\local-packages\Python311\site-packages\telebot\apihelper.py", line 168, in _make_request
+    json_result = _check_result(method_name, result)
+                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\OS\AppData\Local\Packages\PythonSoftwareFoundation.Python.3.11_qbz5n2kfra8p0\LocalCache\local-packages\Python311\site-packages\telebot\apihelper.py", line 195, in _check_result
+    raise ApiTelegramException(method_name, result, result_json)
+telebot.apihelper.ApiTelegramException: A request to the Telegram API was unsuccessful. Error code: 409. Description: Conflict: terminated by other getUpdates request; make sure that only one bot instance is running
+
+2025-08-12 18:38:26,370 - ERROR - Infinity polling: polling exited
+2025-08-12 18:38:26,370 - ERROR - Break infinity polling
