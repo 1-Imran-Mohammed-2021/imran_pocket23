@@ -271,7 +271,7 @@ async def collect_live_prices(symbol, asset_type, count):
             price = await fetch_live_price_async(symbol, asset_type, session)
             if price and isinstance(price, (int, float)):
                 prices.append(price)
-            await asyncio.sleep(3)
+            await asyncio.sleep(2)
     return prices
 
 def fetch_historical_data(symbol, asset_type, interval='1m', limit=100, retries=MAX_RETRIES):
