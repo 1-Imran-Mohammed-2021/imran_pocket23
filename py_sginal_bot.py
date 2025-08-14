@@ -33,9 +33,6 @@ load_dotenv()
 BINANCE_API_KEY = os.getenv('BINANCE_API_KEY')
 
 
-# Validate CurrencyFreaks API key
-if not CURRENCYFREAKS_API_KEY or CURRENCYFREAKS_API_KEY.strip() == "":
-    raise ValueError("CURRENCYFREAKS_API_KEY is missing or empty in .env file. Please provide a valid API key.")
 
 # Generate or load encryption key
 ENCRYPTION_KEY_FILE = 'encryption_key.key'
