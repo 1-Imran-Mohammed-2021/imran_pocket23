@@ -23,15 +23,13 @@ import shutil
 from cryptography.fernet import Fernet
 from datetime import datetime, timedelta
 import uuid
-
+from keep_alive import keep_alive
+keep_alive()
 # ==============================
 # CONFIGURATION
 # ==============================
 load_dotenv()
-TELEGRAM_API_KEY='8224411567:AAF8QFxlN2SYZeUadqzt3C-xoF8fwwgQ7b0'
-TWELVE_DATA_API_KEY='66b7861c69a44a9f8177e5ea3313e0d6'
-ADMIN_CHAT_ID='5389240816'
-CURRENCYFREAKS_API_KEY='b9fe0f84cb944521888236f316b8f3a9'
+
 BINANCE_API_KEY = os.getenv('BINANCE_API_KEY')
 
 
@@ -50,6 +48,10 @@ with open(ENCRYPTION_KEY_FILE, 'rb') as f:
 cipher = Fernet(ENCRYPTION_KEY)
 
 LOOKBACK = 10
+TELEGRAM_API_KEY='8224411567:AAF8QFxlN2SYZeUadqzt3C-xoF8fwwgQ7b0'
+TWELVE_DATA_API_KEY='66b7861c69a44a9f8177e5ea3313e0d6'
+ADMIN_CHAT_ID='5389240816'
+CURRENCYFREAKS_API_KEY='b9fe0f84cb944521888236f316b8f3a9'
 BASE_THRESHOLD_BUY = 0.002
 BASE_THRESHOLD_SELL = -0.002
 MIN_PRICES_REQUIRED = LOOKBACK + 1
