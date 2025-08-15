@@ -36,3 +36,242 @@ telebot.apihelper.ApiTelegramException: A request to the Telegram API was unsucc
 
 2025-08-12 18:38:26,370 - ERROR - Infinity polling: polling exited
 2025-08-12 18:38:26,370 - ERROR - Break infinity polling
+2025-08-15 23:15:39,129 - INFO - Cleaned up 0 expired tokens
+2025-08-15 23:15:39,129 - INFO - Supported forex pairs: ['EURUSD', 'USDJPY', 'GBPUSD', 'MADUSD', 'SARCNY', 'CADCHF', 'QARCNY', 'USDCOP', 'USDTHB', 'GBPAUD', 'UAHUSD', 'USDSGD', 'NZDUSD', 'USDDZD', 'USDPKR', 'USDINR', 'EURRUB', 'GBPJPY', 'EURGBP', 'USDVND', 'USDRUB', 'NGNUSD', 'EURCHF', 'CHFNOK', 'BHDCNY', 'JODCNY', 'NZDJPY', 'USDBDT', 'USDMXN', 'EURNZD', 'USDCNH', 'YERUSD', 'USDPHP', 'EURHUF', 'USDEGP', 'CHFJPY', 'ZARUSD', 'LBPUSD', 'USDARS', 'AEDCNY', 'CADJPY', 'USDBRL', 'AUDCHF', 'EURJPY', 'EURTRY', 'KESUSD', 'OMRCNY', 'TNDUSD', 'USDCAD', 'USDCHF', 'USDCLP', 'USDIDR', 'USDMYR']
+2025-08-15 23:15:39,129 - INFO - Pretraining models...
+2025-08-15 23:15:41,520 - INFO - Fetched 287 historical prices from CoinGecko for BTC
+2025-08-15 23:15:41,528 - INFO - prices_scaled shape in train_model: (287, 1)
+2025-08-15 23:15:41,533 - INFO - X shape after np.array: (277, 10, 1)
+2025-08-15 23:15:41,535 - INFO - y shape: (277,)
+2025-08-15 23:15:41,597 - INFO - X_train shape: torch.Size([221, 10, 1])
+2025-08-15 23:15:41,597 - INFO - X_val shape: torch.Size([56, 10, 1])
+2025-08-15 23:16:01,978 - INFO - Early stopping at epoch 8
+2025-08-15 23:16:01,978 - INFO - Trained model with final validation loss: 0.008344
+2025-08-15 23:16:03,172 - INFO - Saved model for BTC
+2025-08-15 23:16:03,808 - INFO - Fetched 287 historical prices from CoinGecko for ETH
+2025-08-15 23:16:03,812 - INFO - prices_scaled shape in train_model: (287, 1)
+2025-08-15 23:16:03,813 - INFO - X shape after np.array: (277, 10, 1)
+2025-08-15 23:16:03,813 - INFO - y shape: (277,)
+2025-08-15 23:16:03,815 - INFO - X_train shape: torch.Size([221, 10, 1])
+2025-08-15 23:16:03,815 - INFO - X_val shape: torch.Size([56, 10, 1])
+2025-08-15 23:16:05,137 - INFO - Early stopping at epoch 6
+2025-08-15 23:16:05,137 - INFO - Trained model with final validation loss: 0.004180
+2025-08-15 23:16:06,217 - INFO - Saved model for ETH
+2025-08-15 23:16:06,884 - INFO - Fetched 288 historical prices from CoinGecko for BNB
+2025-08-15 23:16:06,884 - INFO - prices_scaled shape in train_model: (288, 1)
+2025-08-15 23:16:06,888 - INFO - X shape after np.array: (278, 10, 1)
+2025-08-15 23:16:06,888 - INFO - y shape: (278,)
+2025-08-15 23:16:06,888 - INFO - X_train shape: torch.Size([222, 10, 1])
+2025-08-15 23:16:06,888 - INFO - X_val shape: torch.Size([56, 10, 1])
+2025-08-15 23:16:08,783 - INFO - Early stopping at epoch 8
+2025-08-15 23:16:08,783 - INFO - Trained model with final validation loss: 0.004994
+2025-08-15 23:16:10,093 - INFO - Saved model for BNB
+2025-08-15 23:16:10,663 - INFO - Fetched 286 historical prices from CoinGecko for SOL
+2025-08-15 23:16:10,680 - INFO - prices_scaled shape in train_model: (286, 1)
+2025-08-15 23:16:10,683 - INFO - X shape after np.array: (276, 10, 1)
+2025-08-15 23:16:10,683 - INFO - y shape: (276,)
+2025-08-15 23:16:10,686 - INFO - X_train shape: torch.Size([220, 10, 1])
+2025-08-15 23:16:10,687 - INFO - X_val shape: torch.Size([56, 10, 1])
+2025-08-15 23:16:12,346 - INFO - Early stopping at epoch 8
+2025-08-15 23:16:12,346 - INFO - Trained model with final validation loss: 0.002628
+2025-08-15 23:16:13,570 - INFO - Saved model for SOL
+2025-08-15 23:16:14,124 - INFO - Fetched 288 historical prices from CoinGecko for XRP
+2025-08-15 23:16:14,124 - INFO - prices_scaled shape in train_model: (288, 1)
+2025-08-15 23:16:14,127 - INFO - X shape after np.array: (278, 10, 1)
+2025-08-15 23:16:14,127 - INFO - y shape: (278,)
+2025-08-15 23:16:14,127 - INFO - X_train shape: torch.Size([222, 10, 1])
+2025-08-15 23:16:14,127 - INFO - X_val shape: torch.Size([56, 10, 1])
+2025-08-15 23:16:15,990 - INFO - Early stopping at epoch 9
+2025-08-15 23:16:16,006 - INFO - Trained model with final validation loss: 0.021693
+2025-08-15 23:16:17,032 - INFO - Saved model for XRP
+2025-08-15 23:16:17,038 - INFO - No cached prices for EURUSD
+2025-08-15 23:16:17,038 - INFO - No cached prices for USDJPY
+2025-08-15 23:16:17,038 - INFO - No cached prices for GBPUSD
+2025-08-15 23:16:17,040 - INFO - No cached prices for MADUSD
+2025-08-15 23:16:17,040 - INFO - No cached prices for SARCNY
+2025-08-15 23:16:17,040 - INFO - No cached prices for CADCHF
+2025-08-15 23:16:17,040 - INFO - No cached prices for QARCNY
+2025-08-15 23:16:17,041 - INFO - No cached prices for USDCOP
+2025-08-15 23:16:17,041 - INFO - No cached prices for USDTHB
+2025-08-15 23:16:17,041 - INFO - No cached prices for GBPAUD
+2025-08-15 23:16:17,041 - INFO - No cached prices for UAHUSD
+2025-08-15 23:16:17,041 - INFO - No cached prices for USDSGD
+2025-08-15 23:16:17,041 - INFO - No cached prices for NZDUSD
+2025-08-15 23:16:17,041 - INFO - No cached prices for USDDZD
+2025-08-15 23:16:17,045 - INFO - No cached prices for USDPKR
+2025-08-15 23:16:17,045 - INFO - No cached prices for USDINR
+2025-08-15 23:16:17,046 - INFO - No cached prices for EURRUB
+2025-08-15 23:16:17,046 - INFO - No cached prices for GBPJPY
+2025-08-15 23:16:17,047 - INFO - No cached prices for EURGBP
+2025-08-15 23:16:17,048 - INFO - No cached prices for USDVND
+2025-08-15 23:16:17,048 - INFO - No cached prices for USDRUB
+2025-08-15 23:16:17,048 - INFO - No cached prices for NGNUSD
+2025-08-15 23:16:17,048 - INFO - No cached prices for EURCHF
+2025-08-15 23:16:17,048 - INFO - No cached prices for CHFNOK
+2025-08-15 23:16:17,051 - INFO - No cached prices for BHDCNY
+2025-08-15 23:16:17,051 - INFO - No cached prices for JODCNY
+2025-08-15 23:16:17,052 - INFO - No cached prices for NZDJPY
+2025-08-15 23:16:17,052 - INFO - No cached prices for USDBDT
+2025-08-15 23:16:17,053 - INFO - No cached prices for USDMXN
+2025-08-15 23:16:17,053 - INFO - No cached prices for EURNZD
+2025-08-15 23:16:17,053 - INFO - No cached prices for USDCNH
+2025-08-15 23:16:17,053 - INFO - No cached prices for YERUSD
+2025-08-15 23:16:17,053 - INFO - No cached prices for USDPHP
+2025-08-15 23:16:17,055 - INFO - No cached prices for EURHUF
+2025-08-15 23:16:17,055 - INFO - No cached prices for USDEGP
+2025-08-15 23:16:17,055 - INFO - No cached prices for CHFJPY
+2025-08-15 23:16:17,055 - INFO - No cached prices for ZARUSD
+2025-08-15 23:16:17,055 - INFO - No cached prices for LBPUSD
+2025-08-15 23:16:17,055 - INFO - No cached prices for USDARS
+2025-08-15 23:16:17,055 - INFO - No cached prices for AEDCNY
+2025-08-15 23:16:17,057 - INFO - No cached prices for CADJPY
+2025-08-15 23:16:17,057 - INFO - No cached prices for USDBRL
+2025-08-15 23:16:17,057 - INFO - No cached prices for AUDCHF
+2025-08-15 23:16:17,057 - INFO - No cached prices for EURJPY
+2025-08-15 23:16:17,057 - INFO - No cached prices for EURTRY
+2025-08-15 23:16:17,057 - INFO - No cached prices for KESUSD
+2025-08-15 23:16:17,057 - INFO - No cached prices for OMRCNY
+2025-08-15 23:16:17,057 - INFO - No cached prices for TNDUSD
+2025-08-15 23:16:17,057 - INFO - No cached prices for USDCAD
+2025-08-15 23:16:17,057 - INFO - No cached prices for USDCHF
+2025-08-15 23:16:17,057 - INFO - No cached prices for USDCLP
+2025-08-15 23:16:17,057 - INFO - No cached prices for USDIDR
+2025-08-15 23:16:17,057 - INFO - No cached prices for USDMYR
+2025-08-15 23:16:17,062 - INFO - Starting trading bot...
+2025-08-15 23:16:17,065 - INFO - Fetched 50 historical prices from CoinGecko for BTC
+2025-08-15 23:16:17,638 - INFO - prices_scaled shape in train_model: (50, 1)
+2025-08-15 23:16:17,638 - INFO - X shape after np.array: (40, 10, 1)
+2025-08-15 23:16:17,638 - INFO - y shape: (40,)
+2025-08-15 23:16:17,642 - INFO - X_train shape: torch.Size([32, 10, 1])
+2025-08-15 23:16:17,642 - INFO - X_val shape: torch.Size([8, 10, 1])
+2025-08-15 23:16:18,247 - INFO - Early stopping at epoch 12
+2025-08-15 23:16:18,247 - INFO - Trained model with final validation loss: 0.030233
+2025-08-15 23:16:18,251 - INFO - Started keep_alive Flask server in separate thread
+2025-08-15 23:16:18,317 - INFO - [31m[1mWARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.[0m
+ * Running on all addresses (0.0.0.0)
+ * Running on http://127.0.0.1:8080
+ * Running on http://10.2.0.2:8080
+2025-08-15 23:16:18,320 - INFO - [33mPress CTRL+C to quit[0m
+2025-08-15 23:16:53,739 - INFO - No authorized users found, creating empty list: [Errno 2] No such file or directory: 'authorized_users.json'
+2025-08-15 23:16:54,244 - WARNING - Unauthorized access attempt by chat_id: [REDACTED]
+2025-08-15 23:16:58,642 - INFO - No authorized users found, creating empty list: [Errno 2] No such file or directory: 'authorized_users.json'
+2025-08-15 23:16:59,197 - WARNING - Unauthorized access attempt by chat_id: [REDACTED]
+2025-08-15 23:20:15,784 - INFO - Generated token for admin [REDACTED]
+2025-08-15 23:20:15,920 - INFO - Admin [REDACTED] generated token
+2025-08-15 23:20:24,579 - INFO - No authorized users found, creating empty list: [Errno 2] No such file or directory: 'authorized_users.json'
+2025-08-15 23:20:24,629 - INFO - Saved authorized users
+2025-08-15 23:20:24,630 - INFO - Authorized new user [REDACTED] with token e0afe3f4-72bd-4118-bfe2-ce1df1c92479
+2025-08-15 23:20:25,157 - INFO - Authorization attempt by [REDACTED] with token: e0afe3f4-72bd-4118-bfe2-ce1df1c92479
+2025-08-15 23:20:29,606 - INFO - Authorized user [REDACTED] started bot
+2025-08-15 23:20:35,234 - INFO - Authorized user [REDACTED] chose forex
+2025-08-15 23:20:38,775 - INFO - Authorized user [REDACTED] selected EURUSD
+2025-08-15 23:20:39,131 - INFO - Cleaned up 0 expired tokens
+2025-08-15 23:20:41,045 - INFO - Authorized user [REDACTED] requested signal for EURUSD (5s)
+2025-08-15 23:20:41,045 - INFO - No cached prices for EURUSD
+2025-08-15 23:20:41,046 - INFO - Initial price cache for EURUSD: 0 prices
+2025-08-15 23:20:41,047 - INFO - Price cache has 0 prices for EURUSD, fetching historical data
+2025-08-15 23:20:41,047 - WARNING - Failed to fetch enough historical data for EURUSD: 0 prices
+2025-08-15 23:20:41,048 - INFO - Collecting 22 live prices for EURUSD
+2025-08-15 23:20:41,691 - INFO - Fetched live price for EURUSD: 1.1650505966833662
+2025-08-15 23:20:42,941 - INFO - Fetched live price for EURUSD: 1.1650505966833662
+2025-08-15 23:20:44,225 - INFO - Fetched live price for EURUSD: 1.1650505966833662
+2025-08-15 23:20:45,499 - INFO - Fetched live price for EURUSD: 1.1650505966833662
+2025-08-15 23:20:46,713 - INFO - Fetched live price for EURUSD: 1.1650505966833662
+2025-08-15 23:20:47,884 - INFO - Fetched live price for EURUSD: 1.1650505966833662
+2025-08-15 23:20:49,080 - INFO - Fetched live price for EURUSD: 1.1650505966833662
+2025-08-15 23:20:50,361 - INFO - Fetched live price for EURUSD: 1.1650505966833662
+2025-08-15 23:20:51,791 - INFO - Fetched live price for EURUSD: 1.1650505966833662
+2025-08-15 23:20:53,038 - INFO - Fetched live price for EURUSD: 1.1650505966833662
+2025-08-15 23:20:54,597 - INFO - Fetched live price for EURUSD: 1.1650505966833662
+2025-08-15 23:20:56,285 - INFO - Fetched live price for EURUSD: 1.1650505966833662
+2025-08-15 23:20:57,959 - INFO - Fetched live price for EURUSD: 1.1650505966833662
+2025-08-15 23:20:59,695 - INFO - Fetched live price for EURUSD: 1.1650505966833662
+2025-08-15 23:21:01,229 - INFO - Fetched live price for EURUSD: 1.1650505966833662
+2025-08-15 23:21:02,634 - INFO - Fetched live price for EURUSD: 1.1650505966833662
+2025-08-15 23:21:04,035 - INFO - Fetched live price for EURUSD: 1.1650505966833662
+2025-08-15 23:21:05,348 - INFO - Fetched live price for EURUSD: 1.1650505966833662
+2025-08-15 23:21:06,646 - INFO - Fetched live price for EURUSD: 1.1650505966833662
+2025-08-15 23:21:07,902 - INFO - Fetched live price for EURUSD: 1.1650505966833662
+2025-08-15 23:21:09,229 - INFO - Fetched live price for EURUSD: 1.1650505966833662
+2025-08-15 23:21:10,470 - INFO - Fetched live price for EURUSD: 1.1650505966833662
+2025-08-15 23:21:12,212 - INFO - Fetched live price for EURUSD: 1.1650505966833662
+2025-08-15 23:21:13,461 - INFO - Fetched live price for EURUSD: 1.1650505966833662
+2025-08-15 23:21:14,685 - INFO - Fetched live price for EURUSD: 1.1650505966833662
+2025-08-15 23:21:15,908 - INFO - Fetched live price for EURUSD: 1.1650505966833662
+2025-08-15 23:21:17,094 - INFO - Fetched live price for EURUSD: 1.1650505966833662
+2025-08-15 23:21:18,100 - INFO - Total prices collected for EURUSD: 27
+2025-08-15 23:21:18,101 - INFO - After outlier removal, total prices for EURUSD: 27
+2025-08-15 23:21:18,104 - INFO - prices_scaled shape: (27, 1)
+2025-08-15 23:21:18,120 - WARNING - Failed to load model for EURUSD: [Errno 2] No such file or directory: 'models/EURUSD.pth'. Training new model.
+2025-08-15 23:21:18,120 - INFO - No pretrained model for EURUSD, training new model
+2025-08-15 23:21:18,121 - INFO - prices_scaled shape in train_model: (27, 1)
+2025-08-15 23:21:18,121 - INFO - X shape after np.array: (17, 10, 1)
+2025-08-15 23:21:18,122 - INFO - y shape: (17,)
+2025-08-15 23:21:18,123 - INFO - X_train shape: torch.Size([13, 10, 1])
+2025-08-15 23:21:18,123 - INFO - X_val shape: torch.Size([4, 10, 1])
+2025-08-15 23:21:18,656 - INFO - Early stopping at epoch 9
+2025-08-15 23:21:18,657 - INFO - Trained model with final validation loss: 0.000012
+2025-08-15 23:21:21,087 - INFO - Saved model for EURUSD
+2025-08-15 23:21:21,093 - INFO - input_data shape for prediction: torch.Size([1, 10, 1])
+2025-08-15 23:21:36,513 - INFO - Authorized user [REDACTED] started bot
+2025-08-15 23:21:49,544 - INFO - Authorized user [REDACTED] chose crypto
+2025-08-15 23:21:52,143 - INFO - Authorized user [REDACTED] selected BTC
+2025-08-15 23:21:54,088 - INFO - Authorized user [REDACTED] requested signal for BTC (10s)
+2025-08-15 23:21:54,089 - INFO - No cached prices for BTC
+2025-08-15 23:21:54,090 - INFO - Initial price cache for BTC: 0 prices
+2025-08-15 23:21:54,090 - INFO - Price cache has 0 prices for BTC, fetching historical data
+2025-08-15 23:21:54,863 - INFO - Fetched 287 historical prices from CoinGecko for BTC
+2025-08-15 23:21:54,910 - INFO - Saved 287 prices for BTC
+2025-08-15 23:21:55,364 - INFO - Fetched live price for BTC: 117196.0
+2025-08-15 23:21:56,496 - INFO - Fetched live price for BTC: 117196.0
+2025-08-15 23:21:57,769 - INFO - Fetched live price for BTC: 117196.0
+2025-08-15 23:21:58,895 - INFO - Fetched live price for BTC: 117196.0
+2025-08-15 23:21:59,991 - ERROR - Error fetching live price for BTC (attempt 1/3): 429, message='Too Many Requests', url='https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=usd'
+2025-08-15 23:21:59,993 - ERROR - API response: [REDACTED]
+2025-08-15 23:22:02,103 - ERROR - Error fetching live price for BTC (attempt 2/3): 429, message='Too Many Requests', url='https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=usd'
+2025-08-15 23:22:02,104 - ERROR - API response: [REDACTED]
+2025-08-15 23:22:04,259 - ERROR - Error fetching live price for BTC (attempt 3/3): 429, message='Too Many Requests', url='https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=usd'
+2025-08-15 23:22:04,259 - ERROR - API response: [REDACTED]
+2025-08-15 23:22:04,259 - ERROR - Failed to fetch live price for BTC after 3 attempts
+2025-08-15 23:22:05,372 - ERROR - Error fetching live price for BTC (attempt 1/3): 429, message='Too Many Requests', url='https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=usd'
+2025-08-15 23:22:05,372 - ERROR - API response: [REDACTED]
+2025-08-15 23:22:07,633 - ERROR - Error fetching live price for BTC (attempt 2/3): 429, message='Too Many Requests', url='https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=usd'
+2025-08-15 23:22:07,633 - ERROR - API response: [REDACTED]
+2025-08-15 23:22:09,733 - ERROR - Error fetching live price for BTC (attempt 3/3): 429, message='Too Many Requests', url='https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=usd'
+2025-08-15 23:22:09,733 - ERROR - API response: [REDACTED]
+2025-08-15 23:22:09,741 - ERROR - Failed to fetch live price for BTC after 3 attempts
+2025-08-15 23:22:10,840 - ERROR - Error fetching live price for BTC (attempt 1/3): 429, message='Too Many Requests', url='https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=usd'
+2025-08-15 23:22:10,853 - ERROR - API response: [REDACTED]
+2025-08-15 23:22:12,952 - ERROR - Error fetching live price for BTC (attempt 2/3): 429, message='Too Many Requests', url='https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=usd'
+2025-08-15 23:22:12,952 - ERROR - API response: [REDACTED]
+2025-08-15 23:22:15,055 - ERROR - Error fetching live price for BTC (attempt 3/3): 429, message='Too Many Requests', url='https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=usd'
+2025-08-15 23:22:15,055 - ERROR - API response: [REDACTED]
+2025-08-15 23:22:15,055 - ERROR - Failed to fetch live price for BTC after 3 attempts
+2025-08-15 23:22:16,170 - ERROR - Error fetching live price for BTC (attempt 1/3): 429, message='Too Many Requests', url='https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=usd'
+2025-08-15 23:22:16,170 - ERROR - API response: [REDACTED]
+2025-08-15 23:22:18,273 - ERROR - Error fetching live price for BTC (attempt 2/3): 429, message='Too Many Requests', url='https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=usd'
+2025-08-15 23:22:18,276 - ERROR - API response: [REDACTED]
+2025-08-15 23:22:20,378 - ERROR - Error fetching live price for BTC (attempt 3/3): 429, message='Too Many Requests', url='https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=usd'
+2025-08-15 23:22:20,381 - ERROR - API response: [REDACTED]
+2025-08-15 23:22:20,382 - ERROR - Failed to fetch live price for BTC after 3 attempts
+2025-08-15 23:22:22,101 - ERROR - Error fetching live price for BTC (attempt 1/3): 429, message='Too Many Requests', url='https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=usd'
+2025-08-15 23:22:22,101 - ERROR - API response: [REDACTED]
+2025-08-15 23:22:24,208 - ERROR - Error fetching live price for BTC (attempt 2/3): 429, message='Too Many Requests', url='https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=usd'
+2025-08-15 23:22:24,208 - ERROR - API response: [REDACTED]
+2025-08-15 23:22:26,436 - ERROR - Error fetching live price for BTC (attempt 3/3): 429, message='Too Many Requests', url='https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=usd'
+2025-08-15 23:22:26,437 - ERROR - API response: [REDACTED]
+2025-08-15 23:22:26,439 - ERROR - Failed to fetch live price for BTC after 3 attempts
+2025-08-15 23:22:27,620 - ERROR - Error fetching live price for BTC (attempt 1/3): 429, message='Too Many Requests', url='https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=usd'
+2025-08-15 23:22:27,621 - ERROR - API response: [REDACTED]
+2025-08-15 23:22:29,730 - ERROR - Error fetching live price for BTC (attempt 2/3): 429, message='Too Many Requests', url='https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=usd'
+2025-08-15 23:22:29,731 - ERROR - API response: [REDACTED]
+2025-08-15 23:22:31,908 - ERROR - Error fetching live price for BTC (attempt 3/3): 429, message='Too Many Requests', url='https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=usd'
+2025-08-15 23:22:31,909 - ERROR - API response: [REDACTED]
+2025-08-15 23:22:31,910 - ERROR - Failed to fetch live price for BTC after 3 attempts
+2025-08-15 23:22:32,921 - INFO - Total prices collected for BTC: 291
+2025-08-15 23:22:32,923 - INFO - After outlier removal, total prices for BTC: 291
+2025-08-15 23:22:32,926 - INFO - prices_scaled shape: (291, 1)
+2025-08-15 23:22:35,183 - INFO - Loaded model for BTC
+2025-08-15 23:22:35,197 - INFO - input_data shape for prediction: torch.Size([1, 10, 1])
+2025-08-15 23:23:30,379 - ERROR - Infinity polling: polling exited
+2025-08-15 23:23:30,379 - ERROR - Break infinity polling

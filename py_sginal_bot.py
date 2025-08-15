@@ -8,7 +8,6 @@ import telebot
 from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton
 from collections import defaultdict
 import logging
-
 import os
 from dotenv import load_dotenv
 import aiohttp
@@ -23,19 +22,60 @@ import shutil
 from cryptography.fernet import Fernet
 from datetime import datetime, timedelta
 import uuid
+import threading
+from threading import Thread
+try:
+    from flask import Flask
+except ImportError:
+    Flask = None
+    logging.warning("Flask not installed. Install with 'pip install flask' to enable keep_alive functionality.")
+
+# ==============================
+# KEEP-ALIVE SERVER
+# ==============================
+if Flask:
+    app = Flask(__name__)
+
+    @app.route('/')
+    def index():
+        return "Bot is alive!"
+
+    def run(port=8080, retries=3):
+        for attempt in range(retries):
+            try:
+                app.run(host='0.0.0.0', port=port, debug=False, use_reloader=False)
+                logger.info(f"Flask server running on port {port}")
+                return
+            except OSError as e:
+                if 'Address already in use' in str(e) and attempt < retries - 1:
+                    logger.warning(f"Port {port} in use, trying port {port + 1}")
+                    port += 1
+                    continue
+                logger.error(f"Failed to start Flask server: {e}")
+                raise
+
+    def keep_alive():
+        try:
+            t = Thread(target=run, kwargs={'port': 8080}, daemon=True)
+            t.start()
+            logger.info("Started keep_alive Flask server in separate thread")
+        except Exception as e:
+            logger.error(f"Failed to start keep_alive thread: {e}")
+else:
+    def keep_alive():
+        logger.warning("keep_alive functionality disabled due to missing Flask module")
 
 # ==============================
 # CONFIGURATION
 # ==============================
 load_dotenv()
-TELEGRAM_API_KEY='8224411567:AAF8QFxlN2SYZeUadqzt3C-xoF8fwwgQ7b0'
-TWELVE_DATA_API_KEY='66b7861c69a44a9f8177e5ea3313e0d6'
-ADMIN_CHAT_ID='5389240816'
-CURRENCYFREAKS_API_KEY='b9fe0f84cb944521888236f316b8f3a9'
-BINANCE_API_KEY = os.getenv('BINANCE_API_KEY')
+TELEGRAM_API_KEY = os.getenv('TELEGRAM_API_KEY')
+CURRENCYFREAKS_API_KEY = os.getenv('CURRENCYFREAKS_API_KEY')
+ADMIN_CHAT_ID = '5389240816'
 
-
-# Validate CurrencyFreaks API key
+# Validate API keys
+if not TELEGRAM_API_KEY or TELEGRAM_API_KEY.strip() == "":
+    raise ValueError("TELEGRAM_API_KEY is missing or empty in .env file. Please provide a valid API key.")
 if not CURRENCYFREAKS_API_KEY or CURRENCYFREAKS_API_KEY.strip() == "":
     raise ValueError("CURRENCYFREAKS_API_KEY is missing or empty in .env file. Please provide a valid API key.")
 
@@ -45,6 +85,7 @@ if not os.path.exists(ENCRYPTION_KEY_FILE):
     key = Fernet.generate_key()
     with open(ENCRYPTION_KEY_FILE, 'wb') as f:
         f.write(key)
+    os.chmod(ENCRYPTION_KEY_FILE, 0o600)  # Restrict to owner read/write
 with open(ENCRYPTION_KEY_FILE, 'rb') as f:
     ENCRYPTION_KEY = f.read()
 cipher = Fernet(ENCRYPTION_KEY)
@@ -58,19 +99,20 @@ FALLBACK_PRICE_COUNT = MIN_PRICES_REQUIRED * 2
 
 # Rate limiting configuration
 RATE_LIMIT_SECONDS = 30
+MAX_REQUESTS_PER_WINDOW = 3
 user_requests = defaultdict(list)
 
 # Token configuration
 TOKEN_EXPIRY_MINUTES = 10
 tokens = {}
 
-# Supported crypto pairs with flags
+# Supported crypto pairs with flags and coingecko_id
 crypto_symbols = {
-    'BTC': {'pair': 'BTCUSDT', 'flag': '₿'},
-    'ETH': {'pair': 'ETHUSDT', 'flag': 'Ξ'},
-    'BNB': {'pair': 'BNBUSDT', 'flag': '🟡'},
-    'SOL': {'pair': 'SOLUSDT', 'flag': '🌞'},
-    'XRP': {'pair': 'XRPUSDT', 'flag': '⚪'}
+    'BTC': {'pair': 'BTCUSDT', 'flag': '₿', 'coingecko_id': 'bitcoin'},
+    'ETH': {'pair': 'ETHUSDT', 'flag': 'Ξ', 'coingecko_id': 'ethereum'},
+    'BNB': {'pair': 'BNBUSDT', 'flag': '🟡', 'coingecko_id': 'binancecoin'},
+    'SOL': {'pair': 'SOLUSDT', 'flag': '🌞', 'coingecko_id': 'solana'},
+    'XRP': {'pair': 'XRPUSDT', 'flag': '⚪', 'coingecko_id': 'ripple'}
 }
 
 # Supported forex pairs
@@ -131,6 +173,43 @@ def get_supported_forex_pairs():
         'USDMYR': {'id': 'USD/MYR', 'flag': '🇺🇸🇲🇾'}
     }
 
+# Internationalization for messages
+translations = {
+    'ku': {
+        'unauthorized': "🚫 تکایە پەیوەندی بەئادمینەوە بکە بۆ وەرگرتنی کلیل",
+        'rate_limit': f"⚠️ تکایە جاوەرەنی بکە {RATE_LIMIT_SECONDS} دوای  هەوڵبدەوە.",
+        'welcome': "بەخێربێت ! تکایە یەکێک لەمانەی خوارەوە هەڵبژێرە:",
+        'select_crypto': "Select Crypto Pair:",
+        'select_forex': "Select Forex Pair:",
+        'select_interval': "تکایە ماوە هەڵبژێرە",
+        'gathering_prices': "⏳ Gathering live prices for",
+        'insufficient_data': "⚠️ Insufficient valid price data for",
+        'insufficient_after_outlier': "⚠️ Insufficient valid price data after outlier removal for",
+        'invalid_data_zero_std': "⚠️ Invalid price data for",
+        'model_train_fail': "⚠️ Failed to train model for",
+        'invalid_asset_type': "⚠️ تکایە ئەسێتێکی تەواوە هەڵبژێرە.",
+        'invalid_pair': "⚠️ جووتێکی هەڵەت هەڵبژاردووە دووبارە هەوڵبدەوە .",
+        'invalid_interval': "⚠️ Invalid interval selected.",
+        'invalid_signal': "⚠️ Invalid signal request.",
+        'error_processing': "⚠️ Error processing request. Please try again.",
+        'error_pair_selection': "⚠️ Error processing pair selection. Please try again.",
+        'error_sending': "⚠️ Error sending message. Please try again later.",
+        'auth_usage': "⚠️ Usage: /auth <token>",
+        'invalid_token_format': "⚠️ Invalid token format. Please provide a valid token.",
+        'invalid_token': "⚠️ تۆکەنێی هەڵە تکایە پەیوەندی بە ئادمین بکە .",
+        'authorized': "ئستا دەتوانی بەنجەبنێ بە /start بۆ دەست پێ کردن، بەسەرکەوتووی چاڵاک کرا !✅.",
+        'new_user_authorized': "✅ New user authorized: [REDACTED]",
+        'buy': 'کڕین',
+        'sell': 'فرۆشتن',
+        'hold': 'چاوەروان کردن',
+        'admin_only': "🚫 تەنها ئادمین دەتوانێت کلیل درووست بکات.",
+        'token_generated': f"🔑 New token: `{{token}}`\nExpires in {TOKEN_EXPIRY_MINUTES} minutes. Share with the user to authorize them."
+    }
+}
+
+def get_message(key, lang='ku'):
+    return translations.get(lang, translations['ku']).get(key, key)
+
 # Setup logging
 logging.basicConfig(
     level=logging.INFO,
@@ -145,8 +224,17 @@ logger = logging.getLogger(__name__)
 bot = telebot.TeleBot(TELEGRAM_API_KEY)
 price_cache = defaultdict(list)
 
-# Initialize forex_symbols
-forex_symbols = {}
+# Single event loop
+loop = asyncio.get_event_loop()
+
+# Redact sensitive data for logging
+def redact_sensitive_data(data):
+    if isinstance(data, dict):
+        data = data.copy()
+        for key in ['apiKey', 'token', 'key']:
+            if key in data:
+                data[key] = '[REDACTED]'
+    return data
 
 # ==============================
 # AUTHORIZATION
@@ -157,8 +245,8 @@ def load_authorized_users():
             encrypted_data = f.read()
             data = cipher.decrypt(encrypted_data)
             return json.loads(data.decode())
-    except (FileNotFoundError, json.JSONDecodeError, ValueError):
-        logger.info("No authorized users found, creating empty list")
+    except (FileNotFoundError, json.JSONDecodeError, ValueError) as e:
+        logger.info(f"No authorized users found, creating empty list: {e}")
         return []
 
 def save_authorized_users(users):
@@ -198,6 +286,21 @@ def validate_token(token, user_chat_id):
     logger.info(f"Authorized new user [REDACTED] with token {token}")
     return True
 
+def cleanup_expired_tokens():
+    now = datetime.now()
+    expired = [token for token, (_, expiry) in tokens.items() if now > expiry]
+    for token in expired:
+        del tokens[token]
+    logger.info(f"Cleaned up {len(expired)} expired tokens")
+
+# Run cleanup every 5 minutes
+def token_cleanup_thread():
+    while True:
+        cleanup_expired_tokens()
+        time.sleep(300)  # 5 minutes
+
+threading.Thread(target=token_cleanup_thread, daemon=True).start()
+
 # ==============================
 # PRICE CACHING
 # ==============================
@@ -224,12 +327,13 @@ async def fetch_live_price_async(symbol, asset_type, session, retries=MAX_RETRIE
     for attempt in range(retries):
         try:
             if asset_type == 'crypto':
-                url = f'https://api.binance.com/api/v3/avgPrice?symbol={crypto_symbols[symbol]["pair"]}'
-                headers = {'X-MBX-APIKEY': BINANCE_API_KEY} if BINANCE_API_KEY else {}
-                async with session.get(url, headers=headers, timeout=5) as response:
+                coingecko_id = crypto_symbols[symbol]["coingecko_id"]
+                url = 'https://api.coingecko.com/api/v3/simple/price'
+                params = {'ids': coingecko_id, 'vs_currencies': 'usd'}
+                async with session.get(url, params=params, timeout=5) as response:
                     response.raise_for_status()
                     data = await response.json()
-                    price = float(data['price']) if 'price' in data else None
+                    price = float(data[coingecko_id]['usd']) if coingecko_id in data else None
                     if price:
                         price_cache[symbol].append(price)
                         price_cache[symbol] = price_cache[symbol][-100:]
@@ -240,7 +344,7 @@ async def fetch_live_price_async(symbol, asset_type, session, retries=MAX_RETRIE
                 async with session.get(url, timeout=5) as response:
                     response.raise_for_status()
                     data = await response.json()
-                    logger.debug(f"CurrencyFreaks API response for {symbol}: {data}")
+                    logger.debug(f"CurrencyFreaks API response for {symbol}: {redact_sensitive_data(data)}")
                     if 'rates' not in data:
                         logger.error(f"Invalid response for {symbol}: {data}")
                         return None
@@ -250,7 +354,11 @@ async def fetch_live_price_async(symbol, asset_type, session, retries=MAX_RETRIE
                     if base not in rates or quote not in rates:
                         logger.error(f"Unsupported currencies for {symbol}: {base} or {quote}")
                         return None
-                    price = float(rates[quote]) / float(rates[base])
+                    try:
+                        price = float(rates[quote]) / float(rates[base])
+                    except (ValueError, ZeroDivisionError) as e:
+                        logger.error(f"Error calculating price for {symbol}: {e}")
+                        return None
                     price_cache[symbol].append(price)
                     price_cache[symbol] = price_cache[symbol][-100:]
                     logger.info(f"Fetched live price for {symbol}: {price}")
@@ -272,23 +380,24 @@ async def collect_live_prices(symbol, asset_type, count):
             price = await fetch_live_price_async(symbol, asset_type, session)
             if price and isinstance(price, (int, float)):
                 prices.append(price)
-            await asyncio.sleep(3)
+            await asyncio.sleep(1)  # Reduced sleep time to respect rate limits
     return prices
 
-def fetch_historical_data(symbol, asset_type, interval='1m', limit=100, retries=MAX_RETRIES):
+def fetch_historical_data(symbol, asset_type, days=1, retries=MAX_RETRIES):
     for attempt in range(retries):
         try:
             if asset_type == 'crypto':
-                url = f'https://api.binance.com/api/v3/klines?symbol={crypto_symbols[symbol]["pair"]}&interval={interval}&limit={limit}'
-                headers = {'X-MBX-APIKEY': BINANCE_API_KEY} if BINANCE_API_KEY else {}
-                response = requests.get(url, headers=headers, timeout=10)
+                coingecko_id = crypto_symbols[symbol]["coingecko_id"]
+                url = f'https://api.coingecko.com/api/v3/coins/{coingecko_id}/market_chart'
+                params = {'vs_currency': 'usd', 'days': days}
+                response = requests.get(url, params=params, timeout=10)
                 response.raise_for_status()
                 data = response.json()
-                prices = [float(item[4]) for item in data]
+                prices = [item[1] for item in data.get('prices', [])]
                 if len(prices) < MIN_PRICES_REQUIRED:
                     logger.warning(f"Insufficient historical data for {symbol}: {len(prices)} prices, needed {MIN_PRICES_REQUIRED}")
                 else:
-                    logger.info(f"Fetched {len(prices)} historical prices from Binance for {symbol}")
+                    logger.info(f"Fetched {len(prices)} historical prices from CoinGecko for {symbol}")
                 return prices
             else:
                 return []
@@ -349,7 +458,7 @@ def train_model(prices_scaled, max_epochs=50, patience=5):
 
     X, y = [], []
     for i in range(len(prices_scaled) - LOOKBACK):
-        X.append(prices_scaled[i:i+LOOKBACK].flatten())
+        X.append(prices_scaled[i:i+LOOKBACK])  # Keep 2D shape [LOOKBACK, 1]
         y.append(prices_scaled[i+LOOKBACK].item())
     if len(X) < 1:
         logger.error(f"Not enough data to train model: {len(prices_scaled)} prices, need >{LOOKBACK}")
@@ -360,8 +469,8 @@ def train_model(prices_scaled, max_epochs=50, patience=5):
     logger.info(f"y shape: {y.shape}")
 
     X_train, X_val, y_train, y_val = train_test_split(X, y, test_size=0.2, shuffle=False)
-    X_train = torch.tensor(X_train, dtype=torch.float32).unsqueeze(-1)
-    X_val = torch.tensor(X_val, dtype=torch.float32).unsqueeze(-1)
+    X_train = torch.tensor(X_train, dtype=torch.float32)
+    X_val = torch.tensor(X_val, dtype=torch.float32)
     y_train = torch.tensor(y_train, dtype=torch.float32)
     y_val = torch.tensor(y_val, dtype=torch.float32)
     
@@ -399,6 +508,24 @@ def train_model(prices_scaled, max_epochs=50, patience=5):
     logger.info(f"Trained model with final validation loss: {best_loss:.6f}")
     return model
 
+def pretrain_models():
+    for symbol in crypto_symbols.keys():
+        prices = fetch_historical_data(symbol, 'crypto', days=1)
+        if len(prices) >= MIN_PRICES_REQUIRED:
+            scaler = MinMaxScaler()
+            prices_scaled = scaler.fit_transform(np.array(prices).reshape(-1, 1))
+            model = train_model(prices_scaled)
+            if model:
+                save_model(model, symbol)
+    for symbol in forex_symbols.keys():
+        prices = load_prices(symbol)
+        if len(prices) >= MIN_PRICES_REQUIRED:
+            scaler = MinMaxScaler()
+            prices_scaled = scaler.fit_transform(np.array(prices).reshape(-1, 1))
+            model = train_model(prices_scaled)
+            if model:
+                save_model(model, symbol)
+
 # ==============================
 # SIGNAL GENERATOR
 # ==============================
@@ -410,11 +537,11 @@ def generate_signal(predicted, current, prices):
     threshold_sell = BASE_THRESHOLD_SELL * (1 + volatility)
     
     if pct_change > threshold_buy:
-        return 'کڕین', '🟢'
+        return get_message('buy'), '🟢'
     elif pct_change < threshold_sell:
-        return 'فرۆشتن', '🔴'
+        return get_message('sell'), '🔴'
     else:
-        return 'چاوەروان کردن', '⚪'
+        return get_message('hold'), '⚪'
 
 # ==============================
 # VISUALIZATION
@@ -445,7 +572,10 @@ def plot_prices(prices, symbol, signal, signal_emoji, chat_id):
     plt.close()
     if chat_id:
         with open(f"{symbol}_prices.png", 'rb') as photo:
-            bot.send_photo(chat_id, photo)
+            try:
+                bot.send_photo(chat_id, photo)
+            except telebot.apihelper.ApiTelegramException as e:
+                logger.error(f"Failed to send photo to {chat_id}: {e}")
     os.remove(f"{symbol}_prices.png")
     logger.info(f"Sent price chart for {symbol} with signal: {signal}")
 
@@ -457,7 +587,10 @@ def start(message):
     authorized_users = load_authorized_users()
     chat_id = str(message.chat.id)
     if chat_id not in authorized_users:
-        bot.send_message(chat_id, "🚫 تکایە پەیوەندی بەئادمینەوە بکە بۆ وەرگرتنی کلیل ")
+        try:
+            bot.send_message(chat_id, get_message('unauthorized'))
+        except telebot.apihelper.ApiTelegramException as e:
+            logger.error(f"Failed to send message to {chat_id}: {e}")
         logger.warning(f"Unauthorized access attempt by chat_id: [REDACTED]")
         return
     markup = InlineKeyboardMarkup()
@@ -465,34 +598,61 @@ def start(message):
         InlineKeyboardButton('📊 Crypto', callback_data='type_crypto'),
         InlineKeyboardButton('💱 Forex', callback_data='type_forex')
     )
-    bot.send_message(chat_id, "بەخێربێت ! تکایە یەکێک لەمانەی خوارەوە هەڵبژێرە:", reply_markup=markup)
+    try:
+        bot.send_message(chat_id, get_message('welcome'), reply_markup=markup)
+    except telebot.apihelper.ApiTelegramException as e:
+        logger.error(f"Failed to send message to {chat_id}: {e}")
     logger.info(f"Authorized user [REDACTED] started bot")
 
 @bot.message_handler(commands=['generate_token'])
 def generate_token_command(message):
     chat_id = str(message.chat.id)
     if chat_id != ADMIN_CHAT_ID:
-        bot.send_message(chat_id, "🚫 تەنها ئادمین دەتوانێت کلیل درووست بکات.")
+        try:
+            bot.send_message(chat_id, get_message('admin_only'))
+        except telebot.apihelper.ApiTelegramException as e:
+            logger.error(f"Failed to send message to {chat_id}: {e}")
         logger.warning(f"Non-admin [REDACTED] attempted to generate token")
         return
     token = generate_token(chat_id)
-    bot.send_message(chat_id, f"🔑 New token: `{token}`\nExpires in {TOKEN_EXPIRY_MINUTES} minutes. Share with the user to authorize them.", parse_mode='Markdown')
+    try:
+        bot.send_message(chat_id, get_message('token_generated').format(token=token), parse_mode='Markdown')
+    except telebot.apihelper.ApiTelegramException as e:
+        logger.error(f"Failed to send message to {chat_id}: {e}")
     logger.info(f"Admin [REDACTED] generated token")
 
 @bot.message_handler(commands=['auth'])
 def auth_command(message):
     chat_id = str(message.chat.id)
+    parts = message.text.split()
+    if len(parts) != 2:
+        try:
+            bot.send_message(chat_id, get_message('auth_usage'))
+        except telebot.apihelper.ApiTelegramException as e:
+            logger.error(f"Failed to send message to {chat_id}: {e}")
+        logger.warning(f"Invalid /auth command by [REDACTED]: incorrect number of arguments")
+        return
+    token = parts[1]
     try:
-        token = message.text.split()[1]
-    except IndexError:
-        bot.send_message(chat_id, "⚠️ Usage: /auth <token>")
-        logger.warning(f"Invalid /auth command by [REDACTED]: no token provided")
+        uuid.UUID(token)  # Validate UUID format
+    except ValueError:
+        try:
+            bot.send_message(chat_id, get_message('invalid_token_format'))
+        except telebot.apihelper.ApiTelegramException as e:
+            logger.error(f"Failed to send message to {chat_id}: {e}")
+        logger.warning(f"Invalid token format by [REDACTED]: {token}")
         return
     if validate_token(token, chat_id):
-        bot.send_message(chat_id, "ئستا دەتوانی بەنجەبنێ بە /start بۆ دەست پێ کردن، بەسەرکەوتووی چاڵاک کرا !✅.")
-        bot.send_message(ADMIN_CHAT_ID, f"✅ New user authorized: [REDACTED]")
+        try:
+            bot.send_message(chat_id, get_message('authorized'))
+            bot.send_message(ADMIN_CHAT_ID, get_message('new_user_authorized'))
+        except telebot.apihelper.ApiTelegramException as e:
+            logger.error(f"Failed to send message: {e}")
     else:
-        bot.send_message(chat_id, "⚠️ تۆکەنێی هەڵە تکایە پەیوەندی بە ئادمین بکە .")
+        try:
+            bot.send_message(chat_id, get_message('invalid_token'))
+        except telebot.apihelper.ApiTelegramException as e:
+            logger.error(f"Failed to send message to {chat_id}: {e}")
     logger.info(f"Authorization attempt by [REDACTED] with token: {token}")
 
 @bot.callback_query_handler(func=lambda call: call.data.startswith('type_'))
@@ -501,12 +661,18 @@ def choose_type(call):
         authorized_users = load_authorized_users()
         chat_id = str(call.message.chat.id)
         if chat_id not in authorized_users:
-            bot.send_message(chat_id, "🚫 تکایە پەیوەندی بە ئادمینەوە بکە بۆ وەرگرتنی کلیی چونەژورەوە")
+            try:
+                bot.send_message(chat_id, get_message('unauthorized'))
+            except telebot.apihelper.ApiTelegramException as e:
+                logger.error(f"Failed to send message to {chat_id}: {e}")
             logger.warning(f"Unauthorized access attempt by chat_id: [REDACTED]")
             return
         asset_type = call.data.split('_')[1]
         if asset_type not in ['crypto', 'forex']:
-            bot.send_message(chat_id, "⚠️ تکایە ئەسێتێکی تەواوە هەڵبژێرە.")
+            try:
+                bot.send_message(chat_id, get_message('invalid_asset_type'))
+            except telebot.apihelper.ApiTelegramException as e:
+                logger.error(f"Failed to send message to {chat_id}: {e}")
             logger.error(f"Invalid asset type: {asset_type}")
             return
         markup = InlineKeyboardMarkup()
@@ -518,10 +684,16 @@ def choose_type(call):
                 for sym in sorted_symbols[i:i+3]
             ]
             markup.row(*row_buttons)
-        bot.send_message(call.message.chat.id, f"Select {'Crypto' if asset_type == 'crypto' else 'Forex'} Pair:", reply_markup=markup)
+        try:
+            bot.send_message(call.message.chat.id, get_message(f'select_{asset_type}'), reply_markup=markup)
+        except telebot.apihelper.ApiTelegramException as e:
+            logger.error(f"Failed to send message to {chat_id}: {e}")
         logger.info(f"Authorized user [REDACTED] chose {asset_type}")
     except Exception as e:
-        bot.send_message(call.message.chat.id, "⚠️ Error processing request. Please try again.")
+        try:
+            bot.send_message(call.message.chat.id, get_message('error_processing'))
+        except telebot.apihelper.ApiTelegramException as ex:
+            logger.error(f"Failed to send message: {ex}")
         logger.error(f"Error in choose_type: {e}")
 
 @bot.callback_query_handler(func=lambda call: call.data.startswith('asset_'))
@@ -530,17 +702,26 @@ def choose_pair(call):
         authorized_users = load_authorized_users()
         chat_id = str(call.message.chat.id)
         if chat_id not in authorized_users:
-            bot.send_message(chat_id, "🚫تکایە پەیوەندی بە ئادمینەوە بکە بۆ وەرگرتنی کیلیل")
+            try:
+                bot.send_message(chat_id, get_message('unauthorized'))
+            except telebot.apihelper.ApiTelegramException as e:
+                logger.error(f"Failed to send message to {chat_id}: {e}")
             logger.warning(f"Unauthorized access attempt by chat_id: [REDACTED]")
             return
         parts = call.data.split('_')
         if len(parts) != 3:
-            bot.send_message(chat_id, "⚠️ جووتێکی هەڵەت هەڵبژاردووە دووبارە هەوڵبدەوە .")
+            try:
+                bot.send_message(chat_id, get_message('invalid_pair'))
+            except telebot.apihelper.ApiTelegramException as e:
+                logger.error(f"Failed to send message to {chat_id}: {e}")
             logger.error(f"Invalid callback data: {call.data}")
             return
         _, asset_type, symbol = parts
         if asset_type not in ['crypto', 'forex'] or symbol not in (crypto_symbols if asset_type == 'crypto' else forex_symbols):
-            bot.send_message(chat_id, "⚠️ Invalid pair selected.")
+            try:
+                bot.send_message(chat_id, get_message('invalid_pair'))
+            except telebot.apihelper.ApiTelegramException as e:
+                logger.error(f"Failed to send message to {chat_id}: {e}")
             logger.error(f"Invalid asset_type or symbol: {asset_type}, {symbol}")
             return
         flag = crypto_symbols[symbol]['flag'] if asset_type == 'crypto' else forex_symbols[symbol]['flag']
@@ -553,10 +734,16 @@ def choose_pair(call):
             InlineKeyboardButton('⏱️ 60s Signal', callback_data=f'signal_{asset_type}_{symbol}_60'),
             InlineKeyboardButton('⏱️ 90s Signal', callback_data=f'signal_{asset_type}_{symbol}_90')
         )
-        bot.send_message(chat_id, f"تکایە ماوە هەڵبژێرە {flag} {symbol}:", reply_markup=markup)
+        try:
+            bot.send_message(chat_id, f"{get_message('select_interval')} {flag} {symbol}:", reply_markup=markup)
+        except telebot.apihelper.ApiTelegramException as e:
+            logger.error(f"Failed to send message to {chat_id}: {e}")
         logger.info(f"Authorized user [REDACTED] selected {symbol}")
     except Exception as e:
-        bot.send_message(call.message.chat.id, "⚠️ Error processing pair selection. Please try again.")
+        try:
+            bot.send_message(call.message.chat.id, get_message('error_pair_selection'))
+        except telebot.apihelper.ApiTelegramException as ex:
+            logger.error(f"Failed to send message: {ex}")
         logger.error(f"Error in choose_pair: {e}")
 
 @bot.callback_query_handler(func=lambda call: call.data.startswith('signal_'))
@@ -565,27 +752,39 @@ def handle_signal(call):
         authorized_users = load_authorized_users()
         chat_id = str(call.message.chat.id)
         if chat_id not in authorized_users:
-            bot.send_message(chat_id, "🚫 Unauthorized access. Please contact the admin for an authorization token.")
+            try:
+                bot.send_message(chat_id, get_message('unauthorized'))
+            except telebot.apihelper.ApiTelegramException as e:
+                logger.error(f"Failed to send message to {chat_id}: {e}")
             logger.warning(f"Unauthorized access attempt by chat_id: [REDACTED]")
             return
 
         # Rate limiting
         now = datetime.now()
         user_requests[chat_id] = [t for t in user_requests[chat_id] if now - t < timedelta(seconds=RATE_LIMIT_SECONDS)]
-        if len(user_requests[chat_id]) >= 1:
-            bot.send_message(chat_id, f"⚠️ تکایە جاوەرەنی بکە {RATE_LIMIT_SECONDS} دوای  هەوڵبدەوە.")
+        if len(user_requests[chat_id]) >= MAX_REQUESTS_PER_WINDOW:
+            try:
+                bot.send_message(chat_id, get_message('rate_limit'))
+            except telebot.apihelper.ApiTelegramException as e:
+                logger.error(f"Failed to send message to {chat_id}: {e}")
             logger.warning(f"Rate limit exceeded for user [REDACTED]")
             return
         user_requests[chat_id].append(now)
 
         parts = call.data.split('_')
         if len(parts) != 4:
-            bot.send_message(chat_id, "⚠️ Invalid signal request.")
+            try:
+                bot.send_message(chat_id, get_message('invalid_signal'))
+            except telebot.apihelper.ApiTelegramException as e:
+                logger.error(f"Failed to send message to {chat_id}: {e}")
             logger.error(f"Invalid callback data: {call.data}")
             return
         _, asset_type, symbol, interval = parts
         if asset_type not in ['crypto', 'forex'] or symbol not in (crypto_symbols if asset_type == 'crypto' else forex_symbols):
-            bot.send_message(chat_id, "⚠️ Invalid pair selected.")
+            try:
+                bot.send_message(chat_id, get_message('invalid_pair'))
+            except telebot.apihelper.ApiTelegramException as e:
+                logger.error(f"Failed to send message to {chat_id}: {e}")
             logger.error(f"Invalid asset_type or symbol: {asset_type}, {symbol}")
             return
         try:
@@ -593,12 +792,18 @@ def handle_signal(call):
             if interval <= 0:
                 raise ValueError("Interval must be positive")
         except ValueError:
-            bot.send_message(chat_id, "⚠️ Invalid interval selected.")
+            try:
+                bot.send_message(chat_id, get_message('invalid_interval'))
+            except telebot.apihelper.ApiTelegramException as e:
+                logger.error(f"Failed to send message to {chat_id}: {e}")
             logger.error(f"Invalid interval: {interval}")
             return
 
         flag = crypto_symbols[symbol]['flag'] if asset_type == 'crypto' else forex_symbols[symbol]['flag']
-        bot.send_message(chat_id, f"⏳ Gathering live prices for {flag} {symbol} ({interval}s)...")
+        try:
+            bot.send_message(chat_id, f"{get_message('gathering_prices')} {flag} {symbol} ({interval}s)...")
+        except telebot.apihelper.ApiTelegramException as e:
+            logger.error(f"Failed to send message to {chat_id}: {e}")
         logger.info(f"Authorized user [REDACTED] requested signal for {symbol} ({interval}s)")
 
         prices = price_cache[symbol]
@@ -607,52 +812,54 @@ def handle_signal(call):
             logger.info(f"Initial price cache for {symbol}: {len(prices)} prices")
         if len(prices) < MIN_PRICES_REQUIRED:
             logger.info(f"Price cache has {len(prices)} prices for {symbol}, fetching historical data")
-            prices = fetch_historical_data(symbol, asset_type, limit=max(100, MIN_PRICES_REQUIRED * 2))
+            prices = fetch_historical_data(symbol, asset_type, days=1)
             if len(prices) >= MIN_PRICES_REQUIRED:
                 save_prices(symbol, prices)
             if len(prices) < MIN_PRICES_REQUIRED:
                 logger.warning(f"Failed to fetch enough historical data for {symbol}: {len(prices)} prices")
                 logger.info(f"Collecting {FALLBACK_PRICE_COUNT} live prices for {symbol}")
-                loop = asyncio.new_event_loop()
-                asyncio.set_event_loop(loop)
-                try:
-                    new_prices = loop.run_until_complete(collect_live_prices(symbol, asset_type, FALLBACK_PRICE_COUNT))
-                    for price in new_prices:
-                        if price and isinstance(price, (int, float)):
-                            prices.append(price)
-                            price_cache[symbol].append(price)
-                            price_cache[symbol] = price_cache[symbol][-100:]
-                finally:
-                    loop.close()
+                new_prices = loop.run_until_complete(collect_live_prices(symbol, asset_type, FALLBACK_PRICE_COUNT))
+                for price in new_prices:
+                    if price and isinstance(price, (int, float)):
+                        prices.append(price)
+                        price_cache[symbol].append(price)
+                        price_cache[symbol] = price_cache[symbol][-100:]
 
         remaining_prices_needed = max(0, MIN_PRICES_REQUIRED - len(prices))
         if remaining_prices_needed > interval:
             logger.info(f"Extending live price collection to {remaining_prices_needed} seconds for {symbol}")
             interval = remaining_prices_needed
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-        try:
-            new_prices = loop.run_until_complete(collect_live_prices(symbol, asset_type, interval))
-            for price in new_prices:
-                if price and isinstance(price, (int, float)):
-                    prices.append(price)
-                    price_cache[symbol].append(price)
-                    price_cache[symbol] = price_cache[symbol][-100:]
-        finally:
-            loop.close()
+        new_prices = loop.run_until_complete(collect_live_prices(symbol, asset_type, interval))
+        for price in new_prices:
+            if price and isinstance(price, (int, float)):
+                prices.append(price)
+                price_cache[symbol].append(price)
+                price_cache[symbol] = price_cache[symbol][-100:]
 
         prices = [p for p in prices if p is not None]
         logger.info(f"Total prices collected for {symbol}: {len(prices)}")
         if len(prices) < MIN_PRICES_REQUIRED:
             markup = InlineKeyboardMarkup()
             markup.add(InlineKeyboardButton('🔄 Retry', callback_data=call.data))
-            bot.send_message(chat_id, f"⚠️ Insufficient valid price data for {flag} {symbol}. Got {len(prices)} prices, need >={MIN_PRICES_REQUIRED}. Check API key or connectivity.", reply_markup=markup)
+            try:
+                bot.send_message(chat_id, f"{get_message('insufficient_data')} {flag} {symbol}. Got {len(prices)} prices, need >={MIN_PRICES_REQUIRED}. Check connectivity.", reply_markup=markup)
+            except telebot.apihelper.ApiTelegramException as e:
+                logger.error(f"Failed to send message to {chat_id}: {e}")
             logger.warning(f"Insufficient data for {symbol}: {len(prices)} prices")
             return
 
         # Remove outliers, but skip if standard deviation is zero
         prices_array = np.array(prices)
         std_dev = np.std(prices_array)
+        if std_dev == 0:
+            markup = InlineKeyboardMarkup()
+            markup.add(InlineKeyboardButton('🔄 Retry', callback_data=call.data))
+            try:
+                bot.send_message(chat_id, f"{get_message('invalid_data_zero_std')} {flag} {symbol}: all prices are identical. Please try again.", reply_markup=markup)
+            except telebot.apihelper.ApiTelegramException as e:
+                logger.error(f"Failed to send message to {chat_id}: {e}")
+            logger.error(f"Zero standard deviation for {symbol}: invalid price data")
+            return
         if std_dev > 0:
             z_scores = np.abs((prices_array - np.mean(prices_array)) / std_dev)
             prices = prices_array[z_scores < 3].tolist()
@@ -664,7 +871,10 @@ def handle_signal(call):
         if len(prices) < MIN_PRICES_REQUIRED:
             markup = InlineKeyboardMarkup()
             markup.add(InlineKeyboardButton('🔄 Retry', callback_data=call.data))
-            bot.send_message(chat_id, f"⚠️ Insufficient valid price data after outlier removal for {flag} {symbol}. Got {len(prices)} prices, need >={MIN_PRICES_REQUIRED}.", reply_markup=markup)
+            try:
+                bot.send_message(chat_id, f"{get_message('insufficient_after_outlier')} {flag} {symbol}. Got {len(prices)} prices, need >={MIN_PRICES_REQUIRED}.", reply_markup=markup)
+            except telebot.apihelper.ApiTelegramException as e:
+                logger.error(f"Failed to send message to {chat_id}: {e}")
             logger.warning(f"Insufficient data after outlier removal for {symbol}: {len(prices)} prices")
             return
 
@@ -678,7 +888,10 @@ def handle_signal(call):
             logger.info(f"No pretrained model for {symbol}, training new model")
             model = train_model(prices_scaled)
             if model is None:
-                bot.send_message(chat_id, f"⚠️ Failed to train model for {flag} {symbol}. Please try again.")
+                try:
+                    bot.send_message(chat_id, f"{get_message('model_train_fail')} {flag} {symbol}. Please try again.")
+                except telebot.apihelper.ApiTelegramException as e:
+                    logger.error(f"Failed to send message to {chat_id}: {e}")
                 logger.error(f"Model training failed for {symbol}")
                 return
             save_model(model, symbol)
@@ -698,10 +911,20 @@ def handle_signal(call):
 
         # Send signal message
         msg = f"{signal_emoji} <b>{flag} {symbol} Signal</b> ({interval}s)\n💰 Current: <b>{current_price:.4f}</b>\n📈 Predicted: <b>{pred_price:.4f}</b>\n📍 Action: <b>{signal}</b>"
-        bot.send_message(chat_id, msg, parse_mode='HTML')
+        try:
+            bot.send_message(chat_id, msg, parse_mode='HTML')
+        except telebot.apihelper.ApiTelegramException as e:
+            logger.error(f"Failed to send message to {chat_id}: {e}")
+            try:
+                bot.send_message(chat_id, get_message('error_sending'))
+            except telebot.apihelper.ApiTelegramException as ex:
+                logger.error(f"Failed to send fallback message to {chat_id}: {ex}")
         logger.info(f"Signal generated for {symbol}: {signal} (Current: {current_price:.4f}, Predicted: {pred_price:.4f})")
     except Exception as e:
-        bot.send_message(call.message.chat.id, "⚠️ Error processing signal request. Please try again.")
+        try:
+            bot.send_message(call.message.chat.id, get_message('error_processing'))
+        except telebot.apihelper.ApiTelegramException as ex:
+            logger.error(f"Failed to send message: {ex}")
         logger.error(f"Error in handle_signal: {e}")
 
 # ==============================
@@ -713,13 +936,12 @@ def run_tests():
     from unittest.mock import patch
 
     class TestTradingBot(unittest.TestCase):
-        def test_fetch_historical_data(self):
-            try:
-                prices = fetch_historical_data('BTC', 'crypto', limit=50)
-                self.assertGreaterEqual(len(prices), MIN_PRICES_REQUIRED, "Should fetch at least 21 prices")
-            except Exception as e:
-                logger.warning(f"Test fetch_historical_data failed: {e}")
-                self.skipTest(f"API unavailable: {e}")
+        @patch('requests.get')
+        def test_fetch_historical_data(self, mock_get):
+            mock_get.return_value.json.return_value = {'prices': [[0, 60000]] * 50}
+            prices = fetch_historical_data('BTC', 'crypto', days=1)
+            self.assertEqual(len(prices), 50)
+            self.assertTrue(all(isinstance(p, float) for p in prices))
 
         def test_train_model(self):
             prices = [60000 + i * 10 for i in range(50)]
@@ -733,12 +955,32 @@ def run_tests():
             with tempfile.TemporaryDirectory() as tmpdir:
                 prices = [60000 + i * 10 for i in range(50)]
                 symbol = 'TEST'
-                signal = 'BUY'
+                signal = get_message('buy')
                 signal_emoji = '🟢'
                 chat_id = 12345
                 plot_prices(prices, symbol, signal, signal_emoji, chat_id)
                 self.assertFalse(os.path.exists(f"{symbol}_prices.png"), "Chart file should be deleted after generation")
                 mock_send_photo.assert_called_once()
+
+        @patch('aiohttp.ClientSession.get')
+        async def test_fetch_live_price_async(self, mock_get):
+            mock_response = {'bitcoin': {'usd': 60000.0}}
+            mock_get.return_value.__aenter__.return_value.json.return_value = mock_response
+            mock_get.return_value.__aenter__.return_value.raise_for_status = lambda: None
+            price = await fetch_live_price_async('BTC', 'crypto', aiohttp.ClientSession())
+            self.assertEqual(price, 60000.0)
+
+            mock_response = {'rates': {'USD': '1.0', 'EUR': '0.85'}}
+            mock_get.return_value.__aenter__.return_value.json.return_value = mock_response
+            mock_get.return_value.__aenter__.return_value.raise_for_status = lambda: None
+            price = await fetch_live_price_async('EURUSD', 'forex', aiohttp.ClientSession())
+            self.assertAlmostEqual(price, 0.85 / 1.0, places=4)
+
+        def test_generate_signal(self):
+            prices = [100, 101, 102, 103, 104]
+            signal, emoji = generate_signal(predicted=110, current=100, prices=prices)
+            self.assertEqual(signal, get_message('buy'))
+            self.assertEqual(emoji, '🟢')
 
     suite = unittest.TestLoader().loadTestsFromTestCase(TestTradingBot)
     unittest.TextTestRunner().run(suite)
@@ -751,11 +993,10 @@ if __name__ == "__main__":
     forex_symbols = get_supported_forex_pairs()
     logger.info(f"Supported forex pairs: {list(forex_symbols.keys())}")
 
-    # Clear existing models
-    if os.path.exists('models'):
-        shutil.rmtree('models')
-        logger.info("Cleared existing model files to ensure compatibility")
-    
+    logger.info("Pretraining models...")
+    pretrain_models()
+
     logger.info("Starting trading bot...")
     run_tests()
+    keep_alive()  # Start keep_alive server
     bot.infinity_polling(none_stop=True)
