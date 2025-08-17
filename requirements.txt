@@ -9,3 +9,5 @@ matplotlib
 requests
 cryptography
 flask
+websockets
+
