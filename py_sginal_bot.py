@@ -1,9 +1,10 @@
+# py_signal_bot.py (updated version)
+
 import pandas as pd
 import numpy as np
 import torch
 import torch.nn as nn
 from sklearn.preprocessing import MinMaxScaler
-from sklearn.model_selection import train_test_split
 import telebot
 from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton
 from collections import defaultdict
@@ -24,60 +25,30 @@ from datetime import datetime, timedelta
 import uuid
 import threading
 from threading import Thread
-try:
-    from flask import Flask
-except ImportError:
-    Flask = None
-    logging.warning("Flask not installed. Install with 'pip install flask' to enable keep_alive functionality.")
+import websockets
 
 # ==============================
 # KEEP-ALIVE SERVER
 # ==============================
-if Flask:
-    app = Flask(__name__)
-
-    @app.route('/')
-    def index():
-        return "Bot is alive!"
-
-    def run(port=8080, retries=3):
-        for attempt in range(retries):
-            try:
-                app.run(host='0.0.0.0', port=port, debug=False, use_reloader=False)
-                logger.info(f"Flask server running on port {port}")
-                return
-            except OSError as e:
-                if 'Address already in use' in str(e) and attempt < retries - 1:
-                    logger.warning(f"Port {port} in use, trying port {port + 1}")
-                    port += 1
-                    continue
-                logger.error(f"Failed to start Flask server: {e}")
-                raise
-
-    def keep_alive():
-        try:
-            t = Thread(target=run, kwargs={'port': 8080}, daemon=True)
-            t.start()
-            logger.info("Started keep_alive Flask server in separate thread")
-        except Exception as e:
-            logger.error(f"Failed to start keep_alive thread: {e}")
-else:
-    def keep_alive():
-        logger.warning("keep_alive functionality disabled due to missing Flask module")
+try:
+    from keep_alive import keep_alive
+except ImportError:
+    keep_alive = None
+    logging.warning("keep_alive module not found or Flask not installed. Install with 'pip install flask' to enable keep_alive functionality.")
 
 # ==============================
 # CONFIGURATION
 # ==============================
 load_dotenv()
 TELEGRAM_API_KEY = os.getenv('TELEGRAM_API_KEY')
-CURRENCYFREAKS_API_KEY = os.getenv('CURRENCYFREAKS_API_KEY')
+TWELVE_DATA_API_KEY = os.getenv('TWELVE_DATA_API_KEY')
 ADMIN_CHAT_ID = '5389240816'
 
 # Validate API keys
 if not TELEGRAM_API_KEY or TELEGRAM_API_KEY.strip() == "":
     raise ValueError("TELEGRAM_API_KEY is missing or empty in .env file. Please provide a valid API key.")
-if not CURRENCYFREAKS_API_KEY or CURRENCYFREAKS_API_KEY.strip() == "":
-    raise ValueError("CURRENCYFREAKS_API_KEY is missing or empty in .env file. Please provide a valid API key.")
+if not TWELVE_DATA_API_KEY or TWELVE_DATA_API_KEY.strip() == "":
+    raise ValueError("TWELVE_DATA_API_KEY is missing or empty in .env file. Please provide a valid API key.")
 
 # Generate or load encryption key
 ENCRYPTION_KEY_FILE = 'encryption_key.key'
@@ -90,9 +61,9 @@ with open(ENCRYPTION_KEY_FILE, 'rb') as f:
     ENCRYPTION_KEY = f.read()
 cipher = Fernet(ENCRYPTION_KEY)
 
-LOOKBACK = 10
-BASE_THRESHOLD_BUY = 0.002
-BASE_THRESHOLD_SELL = -0.002
+LOOKBACK = 58  # 1-hour history at 1-minute intervals
+PRICE_THRESHOLD_BUY = 0.0001  # $0.0001 for buy signal
+PRICE_THRESHOLD_SELL = -0.0001  # -$0.0001 for sell signal
 MIN_PRICES_REQUIRED = LOOKBACK + 1
 MAX_RETRIES = 3
 FALLBACK_PRICE_COUNT = MIN_PRICES_REQUIRED * 2
@@ -106,7 +77,7 @@ user_requests = defaultdict(list)
 TOKEN_EXPIRY_MINUTES = 10
 tokens = {}
 
-# Supported crypto pairs with flags and coingecko_id
+# Supported crypto pairs
 crypto_symbols = {
     'BTC': {'pair': 'BTCUSDT', 'flag': '₿', 'coingecko_id': 'bitcoin'},
     'ETH': {'pair': 'ETHUSDT', 'flag': 'Ξ', 'coingecko_id': 'ethereum'},
@@ -121,56 +92,13 @@ def get_supported_forex_pairs():
         'EURUSD': {'id': 'EUR/USD', 'flag': '🇪🇺🇺🇸'},
         'USDJPY': {'id': 'USD/JPY', 'flag': '🇺🇸🇯🇵'},
         'GBPUSD': {'id': 'GBP/USD', 'flag': '🇬🇧🇺🇸'},
-        'MADUSD': {'id': 'MAD/USD', 'flag': '🇲🇦🇺🇸'},
-        'SARCNY': {'id': 'SAR/CNY', 'flag': '🇸🇦🇨🇳'},
-        'CADCHF': {'id': 'CAD/CHF', 'flag': '🇨🇦🇨🇭'},
-        'QARCNY': {'id': 'QAR/CNY', 'flag': '🇶🇦🇨🇳'},
-        'USDCOP': {'id': 'USD/COP', 'flag': '🇺🇸🇨🇴'},
-        'USDTHB': {'id': 'USD/THB', 'flag': '🇺🇸🇹🇭'},
-        'GBPAUD': {'id': 'GBP/AUD', 'flag': '🇬🇧🇦🇺'},
-        'UAHUSD': {'id': 'UAH/USD', 'flag': '🇺🇦🇺🇸'},
-        'USDSGD': {'id': 'USD/SGD', 'flag': '🇺🇸🇸🇬'},
-        'NZDUSD': {'id': 'NZD/USD', 'flag': '🇳🇿🇺🇸'},
-        'USDDZD': {'id': 'USD/DZD', 'flag': '🇺🇸🇩🇿'},
-        'USDPKR': {'id': 'USD/PKR', 'flag': '🇺🇸🇵🇰'},
-        'USDINR': {'id': 'USD/INR', 'flag': '🇺🇸🇮🇳'},
-        'EURRUB': {'id': 'EUR/RUB', 'flag': '🇪🇺🇷🇺'},
-        'GBPJPY': {'id': 'GBP/JPY', 'flag': '🇬🇧🇯🇵'},
-        'EURGBP': {'id': 'EUR/GBP', 'flag': '🇪🇺🇬🇧'},
-        'USDVND': {'id': 'USD/VND', 'flag': '🇺🇸🇻🇳'},
-        'USDRUB': {'id': 'USD/RUB', 'flag': '🇺🇸🇷🇺'},
-        'NGNUSD': {'id': 'NGN/USD', 'flag': '🇳🇬🇺🇸'},
-        'EURCHF': {'id': 'EUR/CHF', 'flag': '🇪🇺🇨🇭'},
-        'CHFNOK': {'id': 'CHF/NOK', 'flag': '🇨🇭🇳🇴'},
-        'BHDCNY': {'id': 'BHD/CNY', 'flag': '🇧🇭🇨🇳'},
-        'JODCNY': {'id': 'JOD/CNY', 'flag': '🇯🇴🇨🇳'},
-        'NZDJPY': {'id': 'NZD/JPY', 'flag': '🇳🇿🇯🇵'},
-        'USDBDT': {'id': 'USD/BDT', 'flag': '🇺🇸🇧🇩'},
-        'USDMXN': {'id': 'USD/MXN', 'flag': '🇺🇸🇲🇽'},
-        'EURNZD': {'id': 'EUR/NZD', 'flag': '🇪🇺🇳🇿'},
-        'USDCNH': {'id': 'USD/CNH', 'flag': '🇺🇸🇨🇳'},
-        'YERUSD': {'id': 'YER/USD', 'flag': '🇾🇪🇺🇸'},
-        'USDPHP': {'id': 'USD/PHP', 'flag': '🇺🇸🇵🇭'},
-        'EURHUF': {'id': 'EUR/HUF', 'flag': '🇪🇺🇭🇺'},
-        'USDEGP': {'id': 'USD/EGP', 'flag': '🇺🇸🇪🇬'},
-        'CHFJPY': {'id': 'CHF/JPY', 'flag': '🇨🇭🇯🇵'},
-        'ZARUSD': {'id': 'ZAR/USD', 'flag': '🇿🇦🇺🇸'},
-        'LBPUSD': {'id': 'LBP/USD', 'flag': '🇱🇧🇺🇸'},
-        'USDARS': {'id': 'USD/ARS', 'flag': '🇺🇸🇦🇷'},
-        'AEDCNY': {'id': 'AED/CNY', 'flag': '🇦🇪🇨🇳'},
-        'CADJPY': {'id': 'CAD/JPY', 'flag': '🇨🇦🇯🇵'},
-        'USDBRL': {'id': 'USD/BRL', 'flag': '🇺🇸🇧🇷'},
-        'AUDCHF': {'id': 'AUD/CHF', 'flag': '🇦🇺🇨🇭'},
-        'EURJPY': {'id': 'EUR/JPY', 'flag': '🇪🇺🇯🇵'},
-        'EURTRY': {'id': 'EUR/TRY', 'flag': '🇪🇺🇹🇷'},
-        'KESUSD': {'id': 'KES/USD', 'flag': '🇰🇪🇺🇸'},
-        'OMRCNY': {'id': 'OMR/CNY', 'flag': '🇴🇲🇨🇳'},
-        'TNDUSD': {'id': 'TND/USD', 'flag': '🇹🇳🇺🇸'},
+        'AUDUSD': {'id': 'AUD/USD', 'flag': '🇦🇺🇺🇸'},
         'USDCAD': {'id': 'USD/CAD', 'flag': '🇺🇸🇨🇦'},
         'USDCHF': {'id': 'USD/CHF', 'flag': '🇺🇸🇨🇭'},
-        'USDCLP': {'id': 'USD/CLP', 'flag': '🇺🇸🇨🇱'},
-        'USDIDR': {'id': 'USD/IDR', 'flag': '🇺🇸🇮🇩'},
-        'USDMYR': {'id': 'USD/MYR', 'flag': '🇺🇸🇲🇾'}
+        'NZDUSD': {'id': 'NZD/USD', 'flag': '🇳🇿🇺🇸'},
+        'EURJPY': {'id': 'EUR/JPY', 'flag': '🇪🇺🇯🇵'},
+        'GBPJPY': {'id': 'GBP/JPY', 'flag': '🇬🇧🇯🇵'},
+        'EURGBP': {'id': 'EUR/GBP', 'flag': '🇪🇺🇬🇧'}
     }
 
 # Internationalization for messages
@@ -225,7 +153,8 @@ bot = telebot.TeleBot(TELEGRAM_API_KEY)
 price_cache = defaultdict(list)
 
 # Single event loop
-loop = asyncio.get_event_loop()
+loop = asyncio.new_event_loop()
+asyncio.set_event_loop(loop)
 
 # Redact sensitive data for logging
 def redact_sensitive_data(data):
@@ -321,56 +250,64 @@ def load_prices(symbol):
         return []
 
 # ==============================
+# BINANCE WEBSOCKET FOR CRYPTO PRICES
+# ==============================
+async def crypto_websocket():
+    streams = "/".join([sym.lower() + "usdt@ticker" for sym in crypto_symbols])
+    uri = f"wss://stream.binance.com:9443/stream?streams={streams}"
+    while True:
+        try:
+            async with websockets.connect(uri) as ws:
+                logger.info("Connected to Binance websocket")
+                while True:
+                    msg = await ws.recv()
+                    data = json.loads(msg)
+                    if 'data' in data:
+                        d = data['data']
+                        sym = d['s'][:-4].upper()  # BTCUSDT -> BTC
+                        if sym in crypto_symbols:
+                            price = float(d['c'])
+                            price_cache[sym].append(price)
+                            price_cache[sym] = price_cache[sym][- (LOOKBACK * 2):]
+                            logger.debug(f"Updated price for {sym}: {price}")
+        except Exception as e:
+            logger.error(f"Binance websocket error: {e}. Reconnecting in 5 seconds...")
+            await asyncio.sleep(5)
+
+# Start websocket in background
+loop.create_task(crypto_websocket())
+
+# ==============================
 # PRICE FETCHING
 # ==============================
 async def fetch_live_price_async(symbol, asset_type, session, retries=MAX_RETRIES):
-    for attempt in range(retries):
-        try:
-            if asset_type == 'crypto':
-                coingecko_id = crypto_symbols[symbol]["coingecko_id"]
-                url = 'https://api.coingecko.com/api/v3/simple/price'
-                params = {'ids': coingecko_id, 'vs_currencies': 'usd'}
-                async with session.get(url, params=params, timeout=5) as response:
-                    response.raise_for_status()
-                    data = await response.json()
-                    price = float(data[coingecko_id]['usd']) if coingecko_id in data else None
-                    if price:
-                        price_cache[symbol].append(price)
-                        price_cache[symbol] = price_cache[symbol][-100:]
-                        logger.info(f"Fetched live price for {symbol}: {price}")
-                    return price
-            else:
-                url = f'https://api.currencyfreaks.com/v2.0/rates/latest?apikey={CURRENCYFREAKS_API_KEY}'
+    if asset_type == 'crypto':
+        # For crypto, use price_cache updated by websocket
+        if price_cache[symbol]:
+            return price_cache[symbol][-1]
+        else:
+            return None
+    else:
+        # Forex uses Twelve Data quote
+        for attempt in range(retries):
+            try:
+                pair = get_supported_forex_pairs()[symbol]['id'].replace('/', '')
+                url = f'https://api.twelvedata.com/quote?symbol={pair}&apikey={TWELVE_DATA_API_KEY}'
                 async with session.get(url, timeout=5) as response:
                     response.raise_for_status()
                     data = await response.json()
-                    logger.debug(f"CurrencyFreaks API response for {symbol}: {redact_sensitive_data(data)}")
-                    if 'rates' not in data:
+                    if 'close' not in data:
                         logger.error(f"Invalid response for {symbol}: {data}")
                         return None
-                    rates = data['rates']
-                    rates['USD'] = '1.0'  # Base is USD
-                    base, quote = forex_symbols[symbol]['id'].split('/')
-                    if base not in rates or quote not in rates:
-                        logger.error(f"Unsupported currencies for {symbol}: {base} or {quote}")
-                        return None
-                    try:
-                        price = float(rates[quote]) / float(rates[base])
-                    except (ValueError, ZeroDivisionError) as e:
-                        logger.error(f"Error calculating price for {symbol}: {e}")
-                        return None
+                    price = float(data['close'])
                     price_cache[symbol].append(price)
-                    price_cache[symbol] = price_cache[symbol][-100:]
+                    price_cache[symbol] = price_cache[symbol][- (LOOKBACK * 2):]
                     logger.info(f"Fetched live price for {symbol}: {price}")
                     return price
-        except (aiohttp.ClientError, ValueError, KeyError) as e:
-            logger.error(f"Error fetching live price for {symbol} (attempt {attempt+1}/{retries}): {e}")
-            if 'response' in locals() and response:
-                logger.error("API response: [REDACTED]")
-            if attempt < retries - 1:
-                await asyncio.sleep(2)
-            continue
-    logger.error(f"Failed to fetch live price for {symbol} after {retries} attempts")
+            except (aiohttp.ClientError, ValueError, KeyError) as e:
+                logger.error(f"Error fetching live price for {symbol} (attempt {attempt+1}/{retries}): {e}")
+                if attempt < retries - 1:
+                    await asyncio.sleep(2)
     return None
 
 async def collect_live_prices(symbol, asset_type, count):
@@ -380,59 +317,67 @@ async def collect_live_prices(symbol, asset_type, count):
             price = await fetch_live_price_async(symbol, asset_type, session)
             if price and isinstance(price, (int, float)):
                 prices.append(price)
-            await asyncio.sleep(1)  # Reduced sleep time to respect rate limits
+            await asyncio.sleep(5 if asset_type == 'forex' else 1)
     return prices
 
-def fetch_historical_data(symbol, asset_type, days=1, retries=MAX_RETRIES):
+async def fetch_historical_data(symbol, asset_type, session, retries=MAX_RETRIES):
+    # Fetches 1 hour of 1min data (61 prices to include current)
     for attempt in range(retries):
         try:
             if asset_type == 'crypto':
-                coingecko_id = crypto_symbols[symbol]["coingecko_id"]
-                url = f'https://api.coingecko.com/api/v3/coins/{coingecko_id}/market_chart'
-                params = {'vs_currency': 'usd', 'days': days}
-                response = requests.get(url, params=params, timeout=10)
-                response.raise_for_status()
-                data = response.json()
-                prices = [item[1] for item in data.get('prices', [])]
-                if len(prices) < MIN_PRICES_REQUIRED:
-                    logger.warning(f"Insufficient historical data for {symbol}: {len(prices)} prices, needed {MIN_PRICES_REQUIRED}")
-                else:
-                    logger.info(f"Fetched {len(prices)} historical prices from CoinGecko for {symbol}")
-                return prices
+                pair = crypto_symbols[symbol]['pair']
+                url = f'https://api.binance.com/api/v3/klines?symbol={pair}&interval=1m&limit={MIN_PRICES_REQUIRED}'
+                async with session.get(url, timeout=10) as response:
+                    response.raise_for_status()
+                    data = await response.json()
+                    prices = [float(item[4]) for item in data]  # close prices
+                    logger.info(f"Crypto data for {symbol}: {prices[:5]}... (total {len(prices)})")
+                    if len(prices) < MIN_PRICES_REQUIRED:
+                        logger.warning(f"Insufficient historical data for {symbol}: {len(prices)} prices, needed {MIN_PRICES_REQUIRED}")
+                    else:
+                        logger.info(f"Fetched {len(prices)} historical prices from Binance for {symbol}")
+                    return prices
             else:
-                return []
-        except (requests.RequestException, ValueError) as e:
+                # Twelve Data for forex
+                pair = get_supported_forex_pairs()[symbol]['id']
+                url = f'https://api.twelvedata.com/time_series?symbol={pair}&interval=1min&outputsize={MIN_PRICES_REQUIRED}&apikey={TWELVE_DATA_API_KEY}'
+                async with session.get(url, timeout=10) as response:
+                    response.raise_for_status()
+                    data = await response.json()
+                    if 'values' not in data:
+                        logger.error(f"Invalid response for {symbol}: {redact_sensitive_data(data)}")
+                        return []
+                    prices = [float(item['close']) for item in data['values']]
+                    logger.info(f"Forex data for {symbol}: {prices[:5]}... (total {len(prices)})")
+                    if len(prices) < MIN_PRICES_REQUIRED:
+                        logger.warning(f"Insufficient historical data for {symbol}: {len(prices)} prices, needed {MIN_PRICES_REQUIRED}")
+                    else:
+                        logger.info(f"Fetched {len(prices)} historical prices from Twelve Data for {symbol}")
+                    return prices
+        except (aiohttp.ClientError, ValueError, KeyError) as e:
             logger.error(f"Error fetching historical data for {symbol} (attempt {attempt+1}/{retries}): {e}")
-            if 'response' in locals():
-                logger.error("API response: [REDACTED]")
             if attempt < retries - 1:
-                time.sleep(2)
-            continue
-    logger.error(f"Failed to fetch historical data for {symbol} after {retries} attempts")
+                await asyncio.sleep(2)
+            else:
+                logger.error(f"Failed to fetch historical data for {symbol} after {retries} attempts")
     return []
 
 # ==============================
 # LSTM MODEL
 # ==============================
 class LSTMModel(nn.Module):
-    def __init__(self, input_size=1, hidden_size=128, num_layers=3, dropout=0.3):
+    def __init__(self, input_size=1, hidden_size=64, num_layers=2, dropout=0.2):
         super(LSTMModel, self).__init__()
-        self.lstm = nn.LSTM(input_size, hidden_size, num_layers, batch_first=True, dropout=dropout, bidirectional=True)
-        self.fc = nn.Linear(hidden_size * 2, 1)
+        self.num_layers = num_layers
+        self.hidden_size = hidden_size
+        self.lstm = nn.LSTM(input_size, hidden_size, num_layers, batch_first=True, dropout=dropout, bidirectional=False)
+        self.fc = nn.Linear(hidden_size, 1)
 
     def forward(self, x):
-        h_0 = torch.zeros(2 * 3, x.size(0), 128).to(x.device)
-        c_0 = torch.zeros(2 * 3, x.size(0), 128).to(x.device)
+        h_0 = torch.zeros(self.num_layers, x.size(0), self.hidden_size).to(x.device)
+        c_0 = torch.zeros(self.num_layers, x.size(0), self.hidden_size).to(x.device)
         out, _ = self.lstm(x, (h_0, c_0))
         return self.fc(out[:, -1, :])
-
-def save_model(model, symbol):
-    os.makedirs('models', exist_ok=True)
-    state_dict = model.state_dict()
-    encrypted_data = cipher.encrypt(json.dumps({k: v.tolist() for k, v in state_dict.items()}).encode())
-    with open(f'models/{symbol}.pth', 'wb') as f:
-        f.write(encrypted_data)
-    logger.info(f"Saved model for {symbol}")
 
 def load_model(symbol):
     model = LSTMModel()
@@ -446,99 +391,25 @@ def load_model(symbol):
         logger.info(f"Loaded model for {symbol}")
         return model
     except (FileNotFoundError, json.JSONDecodeError, ValueError) as e:
-        logger.warning(f"Failed to load model for {symbol}: {e}. Training new model.")
+        logger.warning(f"Failed to load model for {symbol}: {e}.")
         return None
-
-# ==============================
-# TRAINING FUNCTION
-# ==============================
-def train_model(prices_scaled, max_epochs=50, patience=5):
-    prices_scaled = np.array(prices_scaled).reshape(-1, 1)
-    logger.info(f"prices_scaled shape in train_model: {prices_scaled.shape}")
-
-    X, y = [], []
-    for i in range(len(prices_scaled) - LOOKBACK):
-        X.append(prices_scaled[i:i+LOOKBACK])  # Keep 2D shape [LOOKBACK, 1]
-        y.append(prices_scaled[i+LOOKBACK].item())
-    if len(X) < 1:
-        logger.error(f"Not enough data to train model: {len(prices_scaled)} prices, need >{LOOKBACK}")
-        return None
-
-    X, y = np.array(X), np.array(y)
-    logger.info(f"X shape after np.array: {X.shape}")
-    logger.info(f"y shape: {y.shape}")
-
-    X_train, X_val, y_train, y_val = train_test_split(X, y, test_size=0.2, shuffle=False)
-    X_train = torch.tensor(X_train, dtype=torch.float32)
-    X_val = torch.tensor(X_val, dtype=torch.float32)
-    y_train = torch.tensor(y_train, dtype=torch.float32)
-    y_val = torch.tensor(y_val, dtype=torch.float32)
-    
-    logger.info(f"X_train shape: {X_train.shape}")
-    logger.info(f"X_val shape: {X_val.shape}")
-    
-    model = LSTMModel()
-    criterion = nn.MSELoss()
-    optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
-
-    best_loss = float('inf')
-    patience_counter = 0
-    for epoch in range(max_epochs):
-        model.train()
-        optimizer.zero_grad()
-        output = model(X_train)
-        loss = criterion(output.squeeze(), y_train.squeeze())
-        loss.backward()
-        optimizer.step()
-
-        model.eval()
-        with torch.no_grad():
-            val_output = model(X_val)
-            val_loss = criterion(val_output.squeeze(), y_val.squeeze())
-        
-        if val_loss < best_loss:
-            best_loss = val_loss
-            patience_counter = 0
-        else:
-            patience_counter += 1
-            if patience_counter >= patience:
-                logger.info(f"Early stopping at epoch {epoch+1}")
-                break
-
-    logger.info(f"Trained model with final validation loss: {best_loss:.6f}")
-    return model
-
-def pretrain_models():
-    for symbol in crypto_symbols.keys():
-        prices = fetch_historical_data(symbol, 'crypto', days=1)
-        if len(prices) >= MIN_PRICES_REQUIRED:
-            scaler = MinMaxScaler()
-            prices_scaled = scaler.fit_transform(np.array(prices).reshape(-1, 1))
-            model = train_model(prices_scaled)
-            if model:
-                save_model(model, symbol)
-    for symbol in forex_symbols.keys():
-        prices = load_prices(symbol)
-        if len(prices) >= MIN_PRICES_REQUIRED:
-            scaler = MinMaxScaler()
-            prices_scaled = scaler.fit_transform(np.array(prices).reshape(-1, 1))
-            model = train_model(prices_scaled)
-            if model:
-                save_model(model, symbol)
 
 # ==============================
 # SIGNAL GENERATOR
 # ==============================
 def generate_signal(predicted, current, prices):
-    pct_change = (predicted - current) / current
+    price_diff = predicted - current
     recent_prices = np.array(prices[-20:])
     volatility = np.std(recent_prices / recent_prices.mean()) if len(recent_prices) > 1 else 0
-    threshold_buy = BASE_THRESHOLD_BUY * (1 + volatility)
-    threshold_sell = BASE_THRESHOLD_SELL * (1 + volatility)
+    threshold_buy = PRICE_THRESHOLD_BUY * (1 + volatility)
+    threshold_sell = PRICE_THRESHOLD_SELL * (1 + volatility)
     
-    if pct_change > threshold_buy:
+    logger.info(f"Signal calc: predicted={predicted:.6f}, current={current:.6f}, price_diff={price_diff:.6f}, "
+                f"volatility={volatility:.4f}, threshold_buy={threshold_buy:.6f}, threshold_sell={threshold_sell:.6f}")
+    
+    if price_diff > threshold_buy:
         return get_message('buy'), '🟢'
-    elif pct_change < threshold_sell:
+    elif price_diff < threshold_sell:
         return get_message('sell'), '🔴'
     else:
         return get_message('hold'), '⚪'
@@ -559,7 +430,7 @@ def plot_prices(prices, symbol, signal, signal_emoji, chat_id):
     last_index = len(prices) - 1
     plt.scatter([last_index], [last_price], color='red', s=100, label='Latest Price')
     plt.annotate(
-        f"{signal} ({last_price:.4f})",
+        f"{signal} ({last_price:.6f})",
         xy=(last_index, last_price),
         xytext=(last_index, last_price + (max(prices) - min(prices)) * 0.05),
         arrowprops=dict(facecolor='black', shrink=0.05),
@@ -801,43 +672,59 @@ def handle_signal(call):
 
         flag = crypto_symbols[symbol]['flag'] if asset_type == 'crypto' else forex_symbols[symbol]['flag']
         try:
-            bot.send_message(chat_id, f"{get_message('gathering_prices')} {flag} {symbol} ({interval}s)...")
+            bot.send_message(chat_id, f"{get_message('gathering_prices')} {flag} {symbol} (1h history)...")
         except telebot.apihelper.ApiTelegramException as e:
             logger.error(f"Failed to send message to {chat_id}: {e}")
         logger.info(f"Authorized user [REDACTED] requested signal for {symbol} ({interval}s)")
 
-        prices = price_cache[symbol]
-        if len(prices) < MIN_PRICES_REQUIRED:
-            prices = load_prices(symbol)
-            logger.info(f"Initial price cache for {symbol}: {len(prices)} prices")
-        if len(prices) < MIN_PRICES_REQUIRED:
-            logger.info(f"Price cache has {len(prices)} prices for {symbol}, fetching historical data")
-            prices = fetch_historical_data(symbol, asset_type, days=1)
-            if len(prices) >= MIN_PRICES_REQUIRED:
-                save_prices(symbol, prices)
-            if len(prices) < MIN_PRICES_REQUIRED:
-                logger.warning(f"Failed to fetch enough historical data for {symbol}: {len(prices)} prices")
-                logger.info(f"Collecting {FALLBACK_PRICE_COUNT} live prices for {symbol}")
-                new_prices = loop.run_until_complete(collect_live_prices(symbol, asset_type, FALLBACK_PRICE_COUNT))
-                for price in new_prices:
-                    if price and isinstance(price, (int, float)):
-                        prices.append(price)
-                        price_cache[symbol].append(price)
-                        price_cache[symbol] = price_cache[symbol][-100:]
+        # Fetch historical data
+        async def get_historical_data():
+            async with aiohttp.ClientSession() as session:
+                return await fetch_historical_data(symbol, asset_type, session)
 
-        remaining_prices_needed = max(0, MIN_PRICES_REQUIRED - len(prices))
-        if remaining_prices_needed > interval:
-            logger.info(f"Extending live price collection to {remaining_prices_needed} seconds for {symbol}")
-            interval = remaining_prices_needed
-        new_prices = loop.run_until_complete(collect_live_prices(symbol, asset_type, interval))
-        for price in new_prices:
-            if price and isinstance(price, (int, float)):
-                prices.append(price)
-                price_cache[symbol].append(price)
-                price_cache[symbol] = price_cache[symbol][-100:]
+        historical_data_future = asyncio.run_coroutine_threadsafe(get_historical_data(), loop)
+        try:
+            prices = historical_data_future.result(timeout=10)
+        except asyncio.TimeoutError:
+            logger.error(f"Timeout fetching historical data for {symbol}")
+            try:
+                bot.send_message(chat_id, f"⚠️ Timeout fetching data for {flag} {symbol}. Please try again.")
+            except telebot.apihelper.ApiTelegramException as e:
+                logger.error(f"Failed to send message to {chat_id}: {e}")
+            return
+
+        if len(prices) == LOOKBACK:
+            # If exactly LOOKBACK prices, try to append current price
+            async def get_current_price():
+                async with aiohttp.ClientSession() as session:
+                    return await fetch_live_price_async(symbol, asset_type, session)
+
+            current_price_future = asyncio.run_coroutine_threadsafe(get_current_price(), loop)
+            try:
+                current_price = current_price_future.result(timeout=10)
+                if current_price and (not prices or current_price != prices[-1]):
+                    prices.append(current_price)
+                    price_cache[symbol].append(current_price)
+            except asyncio.TimeoutError:
+                logger.error(f"Timeout fetching current price for {symbol}")
 
         prices = [p for p in prices if p is not None]
         logger.info(f"Total prices collected for {symbol}: {len(prices)}")
+        if len(prices) < MIN_PRICES_REQUIRED:
+            # Fallback to collecting more live prices
+            logger.warning(f"Insufficient data for {symbol}: {len(prices)} prices, fetching more...")
+            async def collect_more_prices():
+                async with aiohttp.ClientSession() as session:
+                    return await collect_live_prices(symbol, asset_type, FALLBACK_PRICE_COUNT - len(prices))
+
+            prices_future = asyncio.run_coroutine_threadsafe(collect_more_prices(), loop)
+            try:
+                new_prices = prices_future.result(timeout=60)
+                prices.extend(new_prices)
+                prices = prices[-MIN_PRICES_REQUIRED:]
+            except asyncio.TimeoutError:
+                logger.error(f"Timeout fetching additional prices for {symbol}")
+
         if len(prices) < MIN_PRICES_REQUIRED:
             markup = InlineKeyboardMarkup()
             markup.add(InlineKeyboardButton('🔄 Retry', callback_data=call.data))
@@ -848,25 +735,16 @@ def handle_signal(call):
             logger.warning(f"Insufficient data for {symbol}: {len(prices)} prices")
             return
 
-        # Remove outliers, but skip if standard deviation is zero
+        # Remove outliers
         prices_array = np.array(prices)
         std_dev = np.std(prices_array)
-        if std_dev == 0:
-            markup = InlineKeyboardMarkup()
-            markup.add(InlineKeyboardButton('🔄 Retry', callback_data=call.data))
-            try:
-                bot.send_message(chat_id, f"{get_message('invalid_data_zero_std')} {flag} {symbol}: all prices are identical. Please try again.", reply_markup=markup)
-            except telebot.apihelper.ApiTelegramException as e:
-                logger.error(f"Failed to send message to {chat_id}: {e}")
-            logger.error(f"Zero standard deviation for {symbol}: invalid price data")
-            return
-        if std_dev > 0:
+        if std_dev < 1e-6:
+            logger.warning(f"Low standard deviation ({std_dev}) for {symbol}, skipping outlier removal")
+            prices = prices_array.tolist()
+        else:
             z_scores = np.abs((prices_array - np.mean(prices_array)) / std_dev)
             prices = prices_array[z_scores < 3].tolist()
             logger.info(f"After outlier removal, total prices for {symbol}: {len(prices)}")
-        else:
-            logger.warning(f"Standard deviation is zero for {symbol}, skipping outlier removal")
-            prices = prices_array.tolist()
 
         if len(prices) < MIN_PRICES_REQUIRED:
             markup = InlineKeyboardMarkup()
@@ -878,23 +756,19 @@ def handle_signal(call):
             logger.warning(f"Insufficient data after outlier removal for {symbol}: {len(prices)} prices")
             return
 
-        # Train model and generate signal
+        # Generate signal
         scaler = MinMaxScaler()
         prices_scaled = scaler.fit_transform(np.array(prices).reshape(-1, 1))
         logger.info(f"prices_scaled shape: {prices_scaled.shape}")
 
         model = load_model(symbol)
         if model is None:
-            logger.info(f"No pretrained model for {symbol}, training new model")
-            model = train_model(prices_scaled)
-            if model is None:
-                try:
-                    bot.send_message(chat_id, f"{get_message('model_train_fail')} {flag} {symbol}. Please try again.")
-                except telebot.apihelper.ApiTelegramException as e:
-                    logger.error(f"Failed to send message to {chat_id}: {e}")
-                logger.error(f"Model training failed for {symbol}")
-                return
-            save_model(model, symbol)
+            try:
+                bot.send_message(chat_id, f"⚠️ No pretrained model for {flag} {symbol}. Please contact admin to pretrain.")
+            except telebot.apihelper.ApiTelegramException as e:
+                logger.error(f"Failed to send message to {chat_id}: {e}")
+            logger.error(f"No pretrained model for {symbol}")
+            return
 
         input_data = torch.tensor(prices_scaled[-LOOKBACK:].reshape(1, LOOKBACK, 1), dtype=torch.float32)
         logger.info(f"input_data shape for prediction: {input_data.shape}")
@@ -906,11 +780,13 @@ def handle_signal(call):
         current_price = prices[-1]
         signal, signal_emoji = generate_signal(pred_price, current_price, prices)
 
-        # Plot prices with signal annotation
+        # Plot prices
         plot_prices(prices, symbol, signal, signal_emoji, chat_id)
 
         # Send signal message
-        msg = f"{signal_emoji} <b>{flag} {symbol} Signal</b> ({interval}s)\n💰 Current: <b>{current_price:.4f}</b>\n📈 Predicted: <b>{pred_price:.4f}</b>\n📍 Action: <b>{signal}</b>"
+        msg = f"{signal_emoji} <b>{flag} {symbol} Signal</b> (1h history)\n💰 Current: <b>{current_price:.6f}</b>\n📈 Predicted: <b>{pred_price:.6f}</b>\n📍 Action: <b>{signal}</b>"
+        if std_dev < 1e-6:
+            msg += "\n⚠️ Warning: Low price variability detected. Signal may be less reliable."
         try:
             bot.send_message(chat_id, msg, parse_mode='HTML')
         except telebot.apihelper.ApiTelegramException as e:
@@ -919,7 +795,7 @@ def handle_signal(call):
                 bot.send_message(chat_id, get_message('error_sending'))
             except telebot.apihelper.ApiTelegramException as ex:
                 logger.error(f"Failed to send fallback message to {chat_id}: {ex}")
-        logger.info(f"Signal generated for {symbol}: {signal} (Current: {current_price:.4f}, Predicted: {pred_price:.4f})")
+        logger.info(f"Signal generated for {symbol}: {signal} (Current: {current_price:.6f}, Predicted: {pred_price:.6f})")
     except Exception as e:
         try:
             bot.send_message(call.message.chat.id, get_message('error_processing'))
@@ -936,24 +812,18 @@ def run_tests():
     from unittest.mock import patch
 
     class TestTradingBot(unittest.TestCase):
-        @patch('requests.get')
-        def test_fetch_historical_data(self, mock_get):
-            mock_get.return_value.json.return_value = {'prices': [[0, 60000]] * 50}
-            prices = fetch_historical_data('BTC', 'crypto', days=1)
-            self.assertEqual(len(prices), 50)
+        @patch('aiohttp.ClientSession.get')
+        async def test_fetch_historical_data(self, mock_get):
+            mock_get.return_value.__aenter__.return_value.json.return_value = [[0, 0, 0, 0, 60000, 0]] * 61
+            async with aiohttp.ClientSession() as session:
+                prices = await fetch_historical_data('BTC', 'crypto', session)
+            self.assertEqual(len(prices), 61)
             self.assertTrue(all(isinstance(p, float) for p in prices))
-
-        def test_train_model(self):
-            prices = [60000 + i * 10 for i in range(50)]
-            scaler = MinMaxScaler()
-            prices_scaled = scaler.fit_transform(np.array(prices).reshape(-1, 1))
-            model = train_model(prices_scaled)
-            self.assertIsNotNone(model, "Model training should succeed")
 
         @patch('__main__.bot.send_photo')
         def test_plot_prices(self, mock_send_photo):
             with tempfile.TemporaryDirectory() as tmpdir:
-                prices = [60000 + i * 10 for i in range(50)]
+                prices = [60000 + i * 0.0001 for i in range(61)]
                 symbol = 'TEST'
                 signal = get_message('buy')
                 signal_emoji = '🟢'
@@ -962,23 +832,9 @@ def run_tests():
                 self.assertFalse(os.path.exists(f"{symbol}_prices.png"), "Chart file should be deleted after generation")
                 mock_send_photo.assert_called_once()
 
-        @patch('aiohttp.ClientSession.get')
-        async def test_fetch_live_price_async(self, mock_get):
-            mock_response = {'bitcoin': {'usd': 60000.0}}
-            mock_get.return_value.__aenter__.return_value.json.return_value = mock_response
-            mock_get.return_value.__aenter__.return_value.raise_for_status = lambda: None
-            price = await fetch_live_price_async('BTC', 'crypto', aiohttp.ClientSession())
-            self.assertEqual(price, 60000.0)
-
-            mock_response = {'rates': {'USD': '1.0', 'EUR': '0.85'}}
-            mock_get.return_value.__aenter__.return_value.json.return_value = mock_response
-            mock_get.return_value.__aenter__.return_value.raise_for_status = lambda: None
-            price = await fetch_live_price_async('EURUSD', 'forex', aiohttp.ClientSession())
-            self.assertAlmostEqual(price, 0.85 / 1.0, places=4)
-
         def test_generate_signal(self):
-            prices = [100, 101, 102, 103, 104]
-            signal, emoji = generate_signal(predicted=110, current=100, prices=prices)
+            prices = [100, 100.0001, 100.0002, 100.0003, 100.0004] * 4  # 20 prices
+            signal, emoji = generate_signal(predicted=100.0002, current=100.0000, prices=prices)
             self.assertEqual(signal, get_message('buy'))
             self.assertEqual(emoji, '🟢')
 
@@ -993,10 +849,16 @@ if __name__ == "__main__":
     forex_symbols = get_supported_forex_pairs()
     logger.info(f"Supported forex pairs: {list(forex_symbols.keys())}")
 
-    logger.info("Pretraining models...")
-    pretrain_models()
+    # Start event loop in a separate thread
+    def run_event_loop():
+        loop.run_forever()
+
+    threading.Thread(target=run_event_loop, daemon=True).start()
 
     logger.info("Starting trading bot...")
     run_tests()
-    keep_alive()  # Start keep_alive server
+    if keep_alive:
+        keep_alive()  # Call from separate file
+    else:
+        logger.warning("keep_alive functionality disabled due to missing module or Flask")
     bot.infinity_polling(none_stop=True)
